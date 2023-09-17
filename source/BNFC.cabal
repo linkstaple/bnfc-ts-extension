@@ -254,6 +254,9 @@ library
     BNFC.Backend.Java.RegToAntlrLexer
     BNFC.Backend.Java.Utils
 
+    -- TypeScript backend
+    BNFC.Backend.TypeScript
+
     -- XML backend
     BNFC.Backend.XML
 
