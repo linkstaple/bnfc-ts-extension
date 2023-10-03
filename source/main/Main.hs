@@ -26,6 +26,7 @@ import BNFC.Backend.Latex
 import BNFC.Backend.OCaml
 import BNFC.Backend.Pygments
 import BNFC.Backend.TypeScript
+import BNFC.Backend.Antlr
 import BNFC.CF (CF)
 import BNFC.GetCF
 import BNFC.Options hiding (make, Backend)
@@ -82,4 +83,5 @@ maketarget = \case
     TargetOCaml        -> makeOCaml
     TargetPygments     -> makePygments
     TargetTypeScript   -> makeTypeScript
+    TargetAntlr       -> makeAntlr
     TargetCheck        -> error "impossible"

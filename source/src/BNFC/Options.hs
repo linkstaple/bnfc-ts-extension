@@ -63,7 +63,7 @@ data Mode
 data Target = TargetC | TargetCpp | TargetCppNoStl
             | TargetHaskell | TargetHaskellGadt | TargetLatex
             | TargetJava | TargetOCaml | TargetPygments
-            | TargetCheck | TargetTypeScript
+            | TargetCheck | TargetTypeScript | TargetAntlr
   deriving (Eq, Bounded, Enum, Ord)
 
 -- | List of Haskell target.
@@ -82,6 +82,7 @@ instance Show Target where
   show TargetPygments     = "Pygments"
   show TargetCheck        = "Check LBNF file"
   show TargetTypeScript   = "TypeScript"
+  show TargetAntlr        = "Antlr4"
 
 -- | Which version of Alex is targeted?
 data AlexVersion = Alex3
@@ -261,6 +262,7 @@ printTargetOption = ("--" ++) . \case
   TargetPygments    -> "pygments"
   TargetCheck       -> "check"
   TargetTypeScript  -> "typescript"
+  TargetAntlr       -> "antlr4"
 
 printAlexOption :: AlexVersion -> String
 printAlexOption = ("--" ++) . \case
@@ -314,6 +316,8 @@ targetOptions =
   , Option "" ["check"]         (NoArg (\ o -> o{target = TargetCheck }))
     "No output. Just check input LBNF file"
   , Option "" ["typescript"]    (NoArg (\o -> o{target = TargetTypeScript}))
+    "Not implemented yet."
+  , Option "" ["antlr"]         (NoArg (\o -> o{target = TargetAntlr}))
     "Not implemented yet."
   ]
 
@@ -530,6 +534,7 @@ instance Maintained Target where
     TargetPygments    -> True
     TargetCheck       -> True
     TargetTypeScript  -> True
+    TargetAntlr       -> True
 
 instance Maintained AlexVersion where
   printFeature = printAlexOption
