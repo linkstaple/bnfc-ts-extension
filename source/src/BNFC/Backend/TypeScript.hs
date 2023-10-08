@@ -8,16 +8,19 @@ import System.FilePath ((</>), pathSeparator)
 import Data.Char (toLower)
 
 import BNFC.Backend.Base
-import BNFC.CF
+import BNFC.CF ( CF )
 import BNFC.Options (SharedOptions (Options, inPackage, lang))
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+))
+import BNFC.Backend.Antlr (makeAntlr)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
-makeTypeScript Options{..} _ = do
+makeTypeScript opts@Options{..} cf = do
+    makeAntlr opts cf
     let packageBase = maybe id (+.+) inPackage pkgName
         dirBase = pkgToDir packageBase
  
     mkfile (dirBase </> "package.json") makeJsonComment packageJsonContent
+    mkfile (dirBase </> "index.ts") makeTsComment indexTsContent
   where
     pkgName = mkName [] CamelCase lang
     pkgToDir = replace '.' pathSeparator
@@ -35,13 +38,30 @@ makeTypeScript Options{..} _ = do
       , indent 2 "\"author\": \"\","
       , indent 2 "\"license\": \"ISC\","
       , indent 2 "\"dependencies\": {"
-      , indent 4 "\"antlr4\": \"^0.5.0-alpha.4\""
+      , indent 4 "\"antlr4\": \"^4.13.1\""
       , indent 2 "},"
       , indent 2 "\"devDependencies\": {"
       , indent 4 "\"ts-node\": \"^10.9.1\","
       , indent 4 "\"typescript\": \"^5.2.2\""
       , indent 2 "}"
       , "}"
+      ]
+
+    lexerClassName = lang ++ "GrammarLexer"
+    parserClassName = lang ++ "GrammarParser"
+
+    indexTsContent = vcat
+      [ "import { CharStream, CommonTokenStream } from 'antlr4'"
+      , text $ "import " ++ lexerClassName ++ " from './" ++ lang ++ "Lexer'"
+      , text $ "import " ++ parserClassName ++ " from './" ++ lang ++ "Parser'"
+      , ""
+      , "const input = 'your text here'"
+      , "const chars = new CharStream(input) // replace this with a FileStream as required"
+      , text $ "const lexer = new " ++ lexerClassName ++ "(chars)"
+      , "const tokens = new CommonTokenStream(lexer)"
+      , text $ "const parser = new " ++ parserClassName ++ "(tokens)"
+      , "const tree = parser.startRule()"
+      , ""
       ]
 
 makeTsComment :: String -> String
