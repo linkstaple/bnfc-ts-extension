@@ -83,5 +83,5 @@ maketarget = \case
     TargetOCaml        -> makeOCaml
     TargetPygments     -> makePygments
     TargetTypeScript   -> makeTypeScript
-    TargetAntlr       -> makeAntlr
+    TargetAntlr        -> makeAntlr
     TargetCheck        -> error "impossible"
