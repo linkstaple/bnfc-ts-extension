@@ -9,9 +9,10 @@ import Data.Char (toLower)
 
 import BNFC.Backend.Base
 import BNFC.CF ( CF )
-import BNFC.Options (SharedOptions (Options, inPackage, lang))
-import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+))
+import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake))
+import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Antlr (makeAntlr)
+import BNFC.Backend.Common.Makefile as MakeFile
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
 makeTypeScript opts@Options{..} cf = do
@@ -21,6 +22,8 @@ makeTypeScript opts@Options{..} cf = do
  
     mkfile (dirBase </> "package.json") makeJsonComment packageJsonContent
     mkfile (dirBase </> "index.ts") makeTsComment indexTsContent
+    MakeFile.mkMakefile optMake makefileContent
+
   where
     pkgName = mkName [] CamelCase lang
     pkgToDir = replace '.' pathSeparator
@@ -63,6 +66,44 @@ makeTypeScript opts@Options{..} cf = do
       , "const tree = parser.startRule()"
       , ""
       ]
+
+    makeVars x = [MakeFile.mkVar n v | (n,v) <- x]
+    makeRules x = [MakeFile.mkRule tar dep recipe  | (tar, dep, recipe) <- x]
+
+    makefileVars = vcat $ makeVars
+      [("LANG", lang)
+      , ("LEXER_NAME", lang ++ "Lexer")
+      , ("PARSER_NAME", lang ++ "Parser")
+      , ("ANTLR4", "java org.antlr.v4.Tool")
+      ]
+
+    refVarWithPrefix :: String -> String
+    refVarWithPrefix refVar = MakeFile.refVar "LANG" </> MakeFile.refVar refVar
+
+    rmFile :: String -> String -> String
+    rmFile refVar ext = "rm -f" +++ refVarWithPrefix refVar ++ ext
+
+    makefileRules =  vcat $ makeRules
+      [ (".PHONY", ["all", "clean", "remove"], [])
+      , ("all", [MakeFile.refVar "LANG"], [])
+      , ("lexer", [refVarWithPrefix "LEXER_NAME" ++ ".g4"], [MakeFile.refVar "ANTLR4" +++ "-Dlanguage=TypeScript" +++ refVarWithPrefix "LEXER_NAME" ++ ".g4"])
+      , ("parser", [refVarWithPrefix "PARSER_NAME" ++ ".g4"], [MakeFile.refVar "ANTLR4" +++ "-Dlanguage=TypeScript" +++ refVarWithPrefix "PARSER_NAME" ++ ".g4"])
+      , ("install-deps", [MakeFile.refVar "LANG" </> "package.json"], ["npm --prefix ./" ++ MakeFile.refVar "LANG" +++ "install" +++ MakeFile.refVar "LANG"])
+      , (MakeFile.refVar "LANG", ["lexer", "parser", "install-deps"], [])
+      , ("clean", [],
+        [ "rm -rf" +++ MakeFile.refVar "LANG" </> "node_modules"
+        , rmFile "LEXER_NAME" ".interp"
+        , rmFile "LEXER_NAME" ".tokens"
+        , rmFile "PARSER_NAME" ".interp"
+        , rmFile "PARSER_NAME" ".tokens"
+        , rmFile "LEXER_NAME" ".ts"
+        , rmFile "PARSER_NAME" ".ts"
+        , rmFile "PARSER_NAME" "Listener.ts"
+        ])
+      , ("remove", [], ["rm -rf" +++ MakeFile.refVar "LANG"])
+      ]
+
+    makefileContent _ = vcat [makefileVars, "", makefileRules, ""]
 
 makeTsComment :: String -> String
 makeTsComment = ("// -- TypeScript -- " ++)
