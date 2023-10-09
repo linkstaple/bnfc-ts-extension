@@ -157,6 +157,7 @@ data SharedOptions = Options
   , visitor       :: Bool
   , wError        :: Bool
   , dLanguage     :: AntlrTarget
+  , xlog          :: Bool
   } deriving (Eq, Ord, Show)
 
 -- We take this opportunity to define the type of the backend functions.
@@ -196,6 +197,7 @@ defaultOptions = Options
   , visitor         = False
   , wError          = False
   , dLanguage       = Java
+  , xlog            = False
   }
 
 -- | Check whether an option is unchanged from the default.
@@ -417,8 +419,11 @@ specificOptions =
   , (Option  []    ["Werror"] (NoArg (\o -> o { wError = True }))
           "Make ANTLR treat warnings as errors"
     ,  [TargetAntlr])
-  , (Option  []    ["language"] (ReqArg (\lang o -> o {dLanguage = mkAntlrTarget lang}) "Dlanguage")
+  , (Option  []    ["language"] (ReqArg (\lang o -> o { dLanguage = mkAntlrTarget lang  }) "Dlanguage")
           "Specify target language for ANTLR"
+    ,  [TargetAntlr])
+  , (Option  []    ["Xlog"] (NoArg (\o -> o {  xlog = True }))
+          "Create log file with information of grammar processing"
     ,  [TargetAntlr])
   ]
 
