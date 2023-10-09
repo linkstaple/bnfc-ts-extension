@@ -14,6 +14,7 @@ module BNFC.Options
   , AlexVersion(..), HappyMode(..), OCamlParser(..), JavaLexerParser(..)
   , RecordPositions(..), TokenText(..)
   , Ansi(..)
+  , AntlrTarget(..)
   , InPackage
   , removedIn290
   , translateOldOptions
@@ -82,7 +83,7 @@ instance Show Target where
   show TargetPygments     = "Pygments"
   show TargetCheck        = "Check LBNF file"
   show TargetTypeScript   = "TypeScript"
-  show TargetAntlr        = "Antlr4"
+  show TargetAntlr        = "ANTLRv4"
 
 -- | Which version of Alex is targeted?
 data AlexVersion = Alex3
@@ -110,6 +111,10 @@ data Ansi = Ansi | BeyondAnsi
 
 -- | Package name (C++ and Java backends).
 type InPackage = Maybe String
+
+-- | ANTLRv4 targets
+data AntlrTarget = CPP | CSharp | Dart | Java | JS | PHP | Python3 | Swift | TS | Go
+    deriving (Eq, Ord, Show)
 
 -- | How to represent token content in the Haskell backend?
 
@@ -147,6 +152,11 @@ data SharedOptions = Options
   --- C# specific
   , visualStudio  :: Bool        -- ^ Generate Visual Studio solution/project files.
   , wcf           :: Bool        -- ^ Windows Communication Foundation.
+  --- ANTLRv4 specific
+  , listener      :: Bool
+  , visitor       :: Bool
+  , wError        :: Bool
+  , dLanguage     :: AntlrTarget
   } deriving (Eq, Ord, Show)
 
 -- We take this opportunity to define the type of the backend functions.
@@ -181,6 +191,11 @@ defaultOptions = Options
   -- C# specific
   , visualStudio    = False
   , wcf             = False
+  -- ANTLRv4 specific
+  , listener        = True
+  , visitor         = False
+  , wError          = False
+  , dLanguage       = Java
   }
 
 -- | Check whether an option is unchanged from the default.
@@ -393,7 +408,32 @@ specificOptions =
   , ( Option []    ["agda"] (NoArg (\o -> o { agda = True, tokenText = TextToken }))
           "Also generate Agda bindings for the abstract syntax"
     , [TargetHaskell] )
+  , (Option  []    ["no-listener"] (NoArg (\o -> o { listener = False }))
+          "Generate visitor for ANTLR result"
+    ,  [TargetAntlr])
+  , (Option  []    ["visitor"] (NoArg (\o -> o { visitor = True }))
+          "Generate visitor for ANTLR result"
+    ,  [TargetAntlr])
+  , (Option  []    ["Werror"] (NoArg (\o -> o { wError = True }))
+          "Make ANTLR treat warnings as errors"
+    ,  [TargetAntlr])
+  , (Option  []    ["language"] (ReqArg (\lang o -> o {dLanguage = mkAntlrTarget lang}) "Dlanguage")
+          "Specify target language for ANTLR"
+    ,  [TargetAntlr])
   ]
+
+mkAntlrTarget :: String -> AntlrTarget
+mkAntlrTarget "java" = Java
+mkAntlrTarget "cpp" = CPP
+mkAntlrTarget "typescript" = TS
+mkAntlrTarget "javascript" = JS
+mkAntlrTarget "dart" = Dart
+mkAntlrTarget "go" = Go
+mkAntlrTarget "php" = PHP
+mkAntlrTarget "swift" = Swift
+mkAntlrTarget "python" = Python3
+mkAntlrTarget "csharp" = CSharp
+mkAntlrTarget _ = Java
 
 -- | The list of specific options for a target.
 specificOptions' :: Target -> [OptDescr (SharedOptions -> SharedOptions)]
@@ -455,7 +495,7 @@ help = unlines $ title ++
     , usageInfo "TARGET languages" targetOptions
     ] ++ map targetUsage helpTargets
   where
-  helpTargets = [ TargetHaskell, TargetJava, TargetC, TargetCpp ]
+  helpTargets = [ TargetHaskell, TargetJava, TargetC, TargetCpp, TargetAntlr ]
   targetUsage t = usageInfo
     (printf "Special options for the %s backend" (show t))
     (specificOptions' t)
