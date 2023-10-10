@@ -159,6 +159,7 @@ data SharedOptions = Options
   , dLanguage     :: AntlrTarget
   , xlog          :: Bool
   , xDbgST        :: Bool
+  , xDbgSTWait    :: Bool
   } deriving (Eq, Ord, Show)
 
 -- We take this opportunity to define the type of the backend functions.
@@ -200,6 +201,7 @@ defaultOptions = Options
   , dLanguage       = Java
   , xlog            = False
   , xDbgST          = False
+  , xDbgSTWait      = False
   }
 
 -- | Check whether an option is unchanged from the default.
@@ -437,6 +439,9 @@ specificOptions =
         [ "Open window with generated code and templates used to generate this code"
         , "It invokes the StringTemplate inspector window."
         ]
+    ,  [TargetAntlr])
+  , (Option  []    ["XdbgSTWait"] (NoArg (\o -> o { xDbgSTWait = True }))
+          "Wait for ST visualizer to close before continuing"
     ,  [TargetAntlr])
   ]
 
