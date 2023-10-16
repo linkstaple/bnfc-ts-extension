@@ -9,19 +9,19 @@ import Data.Char (toLower)
 
 import BNFC.Backend.Base
 import BNFC.CF ( CF )
-import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake))
+import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage, antlrOpts), AntlrTarget (TS))
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Antlr (makeAntlr)
 import BNFC.Backend.Common.Makefile as MakeFile
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
 makeTypeScript opts@Options{..} cf = do
-    makeAntlr opts cf
     let packageBase = maybe id (+.+) inPackage pkgName
         dirBase = pkgToDir packageBase
  
     mkfile (dirBase </> "package.json") makeJsonComment packageJsonContent
     mkfile (dirBase </> "index.ts") makeTsComment indexTsContent
+    makeAntlr (opts {dLanguage = TS, optMake = Nothing}) cf
     MakeFile.mkMakefile optMake makefileContent
 
   where
