@@ -7,12 +7,13 @@ import Text.PrettyPrint ( text, vcat, Doc )
 import System.FilePath ((</>), pathSeparator)
 import Data.Char (toLower)
 
-import BNFC.Backend.Base
+import BNFC.Backend.Base ( MkFiles, mkfile )
 import BNFC.CF ( CF )
 import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage, antlrOpts), AntlrTarget (TS))
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Antlr (makeAntlr)
 import BNFC.Backend.Common.Makefile as MakeFile
+import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
 makeTypeScript opts@Options{..} cf = do
@@ -24,7 +25,10 @@ makeTypeScript opts@Options{..} cf = do
     makeAntlr (opts {dLanguage = TS, optMake = Nothing}) cf
     MakeFile.mkMakefile optMake makefileContent
 
+    mkfile (dirBase </> "abstract.ts") makeTsComment abstractContent
+
   where
+    abstractContent = cfToAbstract cf
     pkgName = mkName [] CamelCase lang
     pkgToDir = replace '.' pathSeparator
 
