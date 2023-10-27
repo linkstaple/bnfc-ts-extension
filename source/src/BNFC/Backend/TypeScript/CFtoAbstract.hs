@@ -41,14 +41,14 @@ dataToAbstract (cat, rules) = vcat
 
 ruleToType :: Cat -> (String, [Cat]) -> Doc
 ruleToType cat (ruleName, cats) = vcat $ concat
-    [ [ text $ "type" +++ typeName ++ " = {"
+    [ [ text $ "type" +++ mkTypeName typeName ++ " = {"
       , indent 2 $ "type: " ++ "'" ++ typeName ++ "'"
       ]
     , valuesList
     , ["}"]
     ]
   where
-    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ catToType cat) [1..] cats
+    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ mkTypeName (catToType cat)) [1..] cats
     typeName = ruleNameToType cat ruleName
 
 -- makes TypeScript union
@@ -56,7 +56,8 @@ ruleToType cat (ruleName, cats) = vcat $ concat
 mkUnion :: TypeName -> [TypeName] -> Doc
 mkUnion typeName types = text typeDecl
   where
-    typeDecl = "type" +++ typeName ++ " = " ++ intercalate " | " types
+    typeDecl = "type" +++ mkTypeName typeName ++ " = " ++ intercalate " | " typeNames
+    typeNames = map mkTypeName types
 
 -- indent string with N spaces
 indent :: Int -> String -> Doc
@@ -65,7 +66,7 @@ indent size = text . (replicate size ' ' ++)
 -- valueType is a string which represents TS basic type
 mkToken :: (String, String) -> Doc
 mkToken (tokenName, valueType) = vcat
-  [ text $ "type" +++ tokenName ++ " = {"
+  [ text $ "type" +++ mkTypeName tokenName ++ " = {"
   , indent 2 $ "type: " ++ wrapSQ tokenName
   , indent 2 $ "value: " ++ valueType
   , "}"
@@ -107,6 +108,9 @@ ruleNameToType cat rule
     | otherwise      = rule
   where
     catName = catToType cat
+
+mkTypeName :: String -> String
+mkTypeName = mkName reservedKeywords MixedCase
 
 reservedKeywords :: [String]
 reservedKeywords =
