@@ -26,7 +26,7 @@ cfToAbstract cf = vcat $ concat
         catStr = catToStr cat
 
     tokenCats = filter shouldCreateToken $ concat $ concatMap (map snd . snd) datas
-    userDefinedTokens = map (\cat -> mkToken (catToType cat, "string")) tokenCats
+    userDefinedTokens = map (\cat -> mkToken (catToTypeName cat, "string")) tokenCats
 
 dataToAbstract :: Data -> Doc
 dataToAbstract (cat, rules) = vcat
@@ -35,7 +35,7 @@ dataToAbstract (cat, rules) = vcat
     , rulesDecl
     ]
   where
-    typeName = catToType cat
+    typeName = mkTypeName $ catToTypeName cat
     ruleNames = map (ruleNameToType cat . fst) rules
     rulesDecl = vcat $ intersperse (text "") $ map (ruleToType cat) rules
 
@@ -48,7 +48,7 @@ ruleToType cat (ruleName, cats) = vcat $ concat
     , ["}"]
     ]
   where
-    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ mkTypeName (catToType cat)) [1..] cats
+    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ catToType cat) [1..] cats
     typeName = ruleNameToType cat ruleName
 
 -- makes TypeScript union
@@ -93,10 +93,17 @@ wrapSQ :: String -> String
 wrapSQ str = "'" ++ str ++ "'"
 
 -- convert category name to TS type name
+catToTypeName :: Cat -> String
+catToTypeName cat = case cat of 
+  TokenCat c -> c ++ "Token"
+  ListCat c  -> catToTypeName c ++ "List"
+  c          -> show c
+
+-- how to refer category as TS type
 catToType :: Cat -> String
-catToType (TokenCat c) = c ++ "Token"
-catToType (ListCat c) = catToType c ++ "List"
-catToType c = show c
+catToType (TokenCat c) = mkTypeName (c ++ "Token")
+catToType (ListCat c) = "Array<" ++ catToType c ++ ">"
+catToType c = mkTypeName (show c)
 
 -- convert rule label to TS type name
 -- ruleNameToType (ListCat (Cat "Command")) "([])" --> "CommandListEmpty"
@@ -107,7 +114,7 @@ ruleNameToType cat rule
     | isOneFun  rule = catName ++ "Single"
     | otherwise      = rule
   where
-    catName = catToType cat
+    catName = mkTypeName $ catToTypeName cat
 
 mkTypeName :: String -> String
 mkTypeName = mkName reservedKeywords MixedCase
