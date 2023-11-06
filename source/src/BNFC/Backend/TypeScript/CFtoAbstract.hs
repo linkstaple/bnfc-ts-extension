@@ -114,7 +114,10 @@ ruleNameToType cat rule
     | isOneFun  rule = catName ++ "Single"
     | otherwise      = rule
   where
-    catName = mkTypeName $ catToTypeName cat
+    catName = catToTypeName cat
+
+isListRuleLabel :: String -> Bool
+isListRuleLabel rule = isNilFun rule || isConsFun rule || isOneFun rule
 
 mkTypeName :: String -> String
 mkTypeName = mkName reservedKeywords MixedCase
