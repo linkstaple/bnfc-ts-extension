@@ -30,6 +30,9 @@ cfToAbstract cf = vcat $ concat
 
 dataToAbstract :: Data -> Doc
 dataToAbstract (cat, rules) = vcat
+    $ if isList then
+    [ text $ "type" +++ typeName +++ "=" +++ catToType cat ]
+    else
     [ mkUnion typeName ruleNames
     , ""
     , rulesDecl
@@ -38,6 +41,9 @@ dataToAbstract (cat, rules) = vcat
     typeName = mkTypeName $ catToTypeName cat
     ruleNames = map (ruleNameToType cat . fst) rules
     rulesDecl = vcat $ intersperse (text "") $ map (ruleToType cat) rules
+
+    -- casting ([]), (:[]) and (:) to single list
+    isList = any (isListRuleLabel . fst) rules
 
 ruleToType :: Cat -> (String, [Cat]) -> Doc
 ruleToType cat (ruleName, cats) = vcat $ concat

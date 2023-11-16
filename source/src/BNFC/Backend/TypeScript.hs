@@ -118,9 +118,6 @@ makeTypeScript opts@Options{..} cf = do
 makeTsComment :: String -> String
 makeTsComment = ("// -- TypeScript -- " ++)
 
-makeJsonComment :: String -> String
-makeJsonComment = ("// -- JSON -- " ++)
-
 -- add N spaces before line
 indent :: Int -> String -> Doc
 indent size = text . (replicate size ' ' ++)
