@@ -3,13 +3,14 @@
 module BNFC.Backend.TypeScript ( makeTypeScript ) where
 
 import Prelude hiding ((<>))
-import Text.PrettyPrint ( text, vcat, Doc )
+import Text.PrettyPrint ( text, vcat, Doc, render )
 import System.FilePath ((</>), pathSeparator)
+import System.Directory ( createDirectoryIfMissing )
 import Data.Char (toLower)
 
-import BNFC.Backend.Base ( MkFiles, mkfile )
+import BNFC.Backend.Base ( MkFiles, mkfile,liftIO )
 import BNFC.CF ( CF )
-import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage, antlrOpts), AntlrTarget (TS))
+import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage, antlrOpts, outDir), AntlrTarget (TS))
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Antlr (makeAntlr)
 import BNFC.Backend.Common.Makefile as MakeFile
@@ -20,10 +21,15 @@ makeTypeScript opts@Options{..} cf = do
     let packageBase = maybe id (+.+) inPackage pkgName
         dirBase = pkgToDir packageBase
  
-    mkfile (dirBase </> "package.json") makeJsonComment packageJsonContent
     mkfile (dirBase </> "index.ts") makeTsComment indexTsContent
     makeAntlr (opts {dLanguage = TS, optMake = Nothing}) cf
     MakeFile.mkMakefile optMake makefileContent
+
+    -- npm does not allow to have comments in package.json file (and cannot perform deps installation)
+    -- so we have to create this file manually
+    let finalDir = outDir </> dirBase
+    liftIO $ createDirectoryIfMissing True finalDir
+    liftIO $ writeFile (finalDir </> "package.json") (render packageJsonContent)
 
     mkfile (dirBase </> "abstract.ts") makeTsComment abstractContent
 
