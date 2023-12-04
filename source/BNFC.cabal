@@ -257,6 +257,8 @@ library
     -- TypeScript backend
     BNFC.Backend.TypeScript
     BNFC.Backend.TypeScript.CFtoAbstract
+    BNFC.Backend.TypeScript.CFtoBuilder
+    BNFC.Backend.TypeScript.Utils
 
     -- Antlr4 backend
     BNFC.Backend.Antlr

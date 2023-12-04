@@ -8,13 +8,15 @@ import System.FilePath ((</>), pathSeparator)
 import System.Directory ( createDirectoryIfMissing )
 import Data.Char (toLower)
 
-import BNFC.Backend.Base ( MkFiles, mkfile,liftIO )
-import BNFC.CF ( CF )
+import BNFC.Backend.Base (MkFiles, mkfile,liftIO)
+import BNFC.CF (CF, getAbstractSyntax)
 import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage, antlrOpts, outDir), AntlrTarget (TS))
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Antlr (makeAntlr)
 import BNFC.Backend.Common.Makefile as MakeFile
 import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
+import BNFC.Backend.TypeScript.CFtoBuilder (cfToBuilder, mkBuildFnName)
+import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
 makeTypeScript opts@Options{..} cf = do
@@ -32,9 +34,12 @@ makeTypeScript opts@Options{..} cf = do
     liftIO $ writeFile (finalDir </> "package.json") (render packageJsonContent)
 
     mkfile (dirBase </> "abstract.ts") makeTsComment abstractContent
+    mkfile (dirBase </> "builder.ts") makeTsComment builderContent
 
   where
     abstractContent = cfToAbstract cf
+    datas = getAbstractSyntax cf
+    builderContent = cfToBuilder cf opts
     pkgName = mkName [] CamelCase lang
     pkgToDir = replace '.' pathSeparator
 
@@ -63,19 +68,23 @@ makeTypeScript opts@Options{..} cf = do
     lexerClassName = lang ++ "GrammarLexer"
     parserClassName = lang ++ "GrammarParser"
 
-    indexTsContent = vcat
-      [ "import { CharStream, CommonTokenStream } from 'antlr4'"
-      , text $ "import " ++ lexerClassName ++ " from './" ++ lang ++ "Lexer'"
-      , text $ "import " ++ parserClassName ++ " from './" ++ lang ++ "Parser'"
+    indexTsContent = vcat $ map text
+      [ "import {CharStream, CommonTokenStream} from 'antlr4'"
+      , "import " ++ lexerClassName ++ " from './" ++ lang ++ "Lexer'"
+      , "import " ++ parserClassName ++ " from './" ++ lang ++ "Parser'"
+      , "import {" ++ rootBuildFnName ++ "} from './builder'"
       , ""
       , "const input = 'your text here'"
       , "const chars = new CharStream(input) // replace this with a FileStream as required"
-      , text $ "const lexer = new " ++ lexerClassName ++ "(chars)"
+      , "const lexer = new " ++ lexerClassName ++ "(chars)"
       , "const tokens = new CommonTokenStream(lexer)"
-      , text $ "const parser = new " ++ parserClassName ++ "(tokens)"
-      , "const tree = parser.startRule()"
+      , "const parser = new " ++ parserClassName ++ "(tokens)"
+      , "const tree =" +++ rootBuildFnName ++ "(parser." ++ catToNT rootCat ++ "())"
+      , "console.log(tree)"
       , ""
       ]
+    rootBuildFnName = mkBuildFnName rootCat
+    rootCat = fst (head datas)
 
     makeVars x = [MakeFile.mkVar n v | (n,v) <- x]
     makeRules x = [MakeFile.mkRule tar dep recipe  | (tar, dep, recipe) <- x]

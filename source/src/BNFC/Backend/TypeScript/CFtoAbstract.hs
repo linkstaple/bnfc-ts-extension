@@ -3,144 +3,70 @@ module BNFC.Backend.TypeScript.CFtoAbstract where
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 import Data.List (intercalate, intersperse)
 
-import BNFC.CF (CF, Cat (TokenCat, ListCat), Data, getAbstractSyntax, IsFun (isNilFun, isConsFun, isOneFun), isTokenCat, catToStr)
+import BNFC.CF (CF, Data, getAbstractSyntax, catToStr, isList, Cat)
 import BNFC.Utils
+import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, getTokenCats, catToTsType)
 
 type TypeName = String
 
 cfToAbstract :: CF -> Doc
 cfToAbstract cf = vcat $ concat
-    [ predefinedTokens
-    , userDefinedTokens
+    [ tokensDecl
     , [text ""]
     , intersperse (text "") abstractNodes
     ]
   where
     datas = getAbstractSyntax cf
-    abstractNodes = map dataToAbstract datas
+    -- we don't need to declare list types, because they will be
+    -- referenced directly with Array<SomeType>
+    datasWithoutLists = filter (not . isList . fst) datas
+    abstractNodes = map dataToAbstract datasWithoutLists
 
-    -- defining tokens denoted with 'token' LBNF keyword
-    shouldCreateToken :: Cat -> Bool
-    shouldCreateToken cat = isTokenCat cat && notElem catStr reservedTokenNames
-      where
-        catStr = catToStr cat
-
-    tokenCats = filter shouldCreateToken $ concat $ concatMap (map snd . snd) datas
-    userDefinedTokens = map (\cat -> mkToken (catToTypeName cat, "string")) tokenCats
+    allTokenCats = getTokenCats datas
+    tokensDecl = concatMap (map text . mkToken) allTokenCats
 
 dataToAbstract :: Data -> Doc
 dataToAbstract (cat, rules) = vcat
-    $ if isList then
-    [ text $ "type" +++ typeName +++ "=" +++ catToType cat ]
-    else
     [ mkUnion typeName ruleNames
     , ""
     , rulesDecl
     ]
   where
-    typeName = mkTypeName $ catToTypeName cat
-    ruleNames = map (ruleNameToType cat . fst) rules
-    rulesDecl = vcat $ intersperse (text "") $ map (ruleToType cat) rules
+    typeName = catToTsType cat
+    ruleNames = map (toMixedCase . fst) rules
+    rulesDecl = vcat $ intersperse (text "") $ map mkRuleDecl rules
 
-    -- casting ([]), (:[]) and (:) to single list
-    isList = any (isListRuleLabel . fst) rules
-
-ruleToType :: Cat -> (String, [Cat]) -> Doc
-ruleToType cat (ruleName, cats) = vcat $ concat
-    [ [ text $ "type" +++ mkTypeName typeName ++ " = {"
-      , indent 2 $ "type: " ++ "'" ++ typeName ++ "'"
+mkRuleDecl :: (String, [Cat]) -> Doc
+mkRuleDecl (ruleName, cats) = vcat $ concat
+    [ [ text $ "export type" +++ toMixedCase typeName ++ " = {"
+      , indent 2 $ "type:" +++ wrapSQ ruleName
       ]
     , valuesList
     , ["}"]
     ]
   where
-    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ catToType cat) [1..] cats
-    typeName = ruleNameToType cat ruleName
+    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ catToTsType cat) [1..] cats
+    typeName = toMixedCase ruleName
 
 -- makes TypeScript union
 -- mkUnion "Either" ["Left", "Right"] --> type Either = Left | Right
 mkUnion :: TypeName -> [TypeName] -> Doc
-mkUnion typeName types = text typeDecl
+mkUnion typeName typeNames = text typeDecl
   where
-    typeDecl = "type" +++ mkTypeName typeName ++ " = " ++ intercalate " | " typeNames
-    typeNames = map mkTypeName types
+    typeDecl = "export type" +++ typeName ++ " = " ++ intercalate " | " typeNames
 
 -- indent string with N spaces
 indent :: Int -> String -> Doc
 indent size = text . (replicate size ' ' ++)
 
 -- valueType is a string which represents TS basic type
-mkToken :: (String, String) -> Doc
-mkToken (tokenName, valueType) = vcat
-  [ text $ "type" +++ mkTypeName tokenName ++ " = {"
-  , indent 2 $ "type: " ++ wrapSQ tokenName
-  , indent 2 $ "value: " ++ valueType
-  , "}"
-  ]
+mkToken :: Cat -> [String]
+mkToken tokenCat =
+    [ "export type" +++ catToTsType tokenCat ++ " = {"
+    , indentStr 2 $ "type: " ++ wrapSQ (catToStr tokenCat ++ "Token")
+    , indentStr 2 $ "value: " ++ value
+    , "}"
+    ]
 
-reservedTokenNames :: [String]
-reservedTokenNames =
-  [ "String"
-  , "Ident"
-  , "Char"
-  , "Integer"
-  , "Double"
-  ]
-
-predefinedTokens :: [Doc]
-predefinedTokens = tokens
   where
-    tokens = zipWith
-            (curry mkToken) (map (++ "Token") reservedTokenNames)
-            ["string", "string", "string", "number", "number"]
-
--- wrap string into single quotes
-wrapSQ :: String -> String
-wrapSQ str = "'" ++ str ++ "'"
-
--- convert category name to TS type name
-catToTypeName :: Cat -> String
-catToTypeName cat = case cat of 
-  TokenCat c -> c ++ "Token"
-  ListCat c  -> catToTypeName c ++ "List"
-  c          -> show c
-
--- how to refer category as TS type
-catToType :: Cat -> String
-catToType (TokenCat c) = mkTypeName (c ++ "Token")
-catToType (ListCat c) = "Array<" ++ catToType c ++ ">"
-catToType c = mkTypeName (show c)
-
--- convert rule label to TS type name
--- ruleNameToType (ListCat (Cat "Command")) "([])" --> "CommandListEmpty"
-ruleNameToType :: Cat -> String -> String
-ruleNameToType cat rule 
-    | isNilFun  rule = catName ++ "Empty"
-    | isConsFun rule = catName ++ "Cons"
-    | isOneFun  rule = catName ++ "Single"
-    | otherwise      = rule
-  where
-    catName = catToTypeName cat
-
-isListRuleLabel :: String -> Bool
-isListRuleLabel rule = isNilFun rule || isConsFun rule || isOneFun rule
-
-mkTypeName :: String -> String
-mkTypeName = mkName reservedKeywords MixedCase
-
-reservedKeywords :: [String]
-reservedKeywords =
-  [ "type"
-  , "class"
-  , "const"
-  , "var"
-  , "export"
-  , "default"
-  , "import"
-  , "function"
-  , "number"
-  , "string"
-  , "undefined"
-  , "null"
-  ]
-  
+    value = if catToStr tokenCat `elem` ["Integer", "Double"] then "number" else "string"

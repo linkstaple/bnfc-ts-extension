@@ -19,7 +19,8 @@ module BNFC.Utils
     , pad, table
     , mkName, mkNames, NameStyle(..)
     , capitalize
-    , lowerCase, upperCase, mixedCase
+    , lowerCase, upperCase
+    , mixedCase, mixedCase_
     , camelCase, camelCase_
     , snakeCase, snakeCase_
     , replace
@@ -488,6 +489,9 @@ camelCase_ = mkName [] CamelCase
 
 mixedCase :: String -> Doc
 mixedCase = text . mkName [] MixedCase
+
+mixedCase_ :: String -> String
+mixedCase_ = mkName [] MixedCase
 
 -- | To snake case.
 -- >>> snakeCase "MyIdent"
