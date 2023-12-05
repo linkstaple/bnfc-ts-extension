@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module BNFC.Backend.Antlr.CFtoAntlr4Parser ( cf2AntlrParse ) where
+module BNFC.Backend.Antlr.CFtoAntlr4Parser ( cf2AntlrParse, catToNT ) where
 
 import Data.Foldable ( toList )
 import Data.Maybe

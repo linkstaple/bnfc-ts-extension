@@ -58,29 +58,26 @@ mkBuildFunction (cat, ruleDescription) = concat
           then mkOneListCheck listItemCat
           else []) labels
 
-    mkConsListCheck cat =
+    mkConsListCheck itemCat =
         [ "if (arg instanceof" +++ catid ++ "_PrependFirstContext) {"
-        , indentStr 2 $ "const item = arg." ++ itemName ++ "()"
-        , indentStr 2 $ "const list = arg." ++ listName ++ "()"
+        , indentStr 2 $ "const item = arg." ++ catToNT itemCat ++ "()"
+        , indentStr 2 $ "const list = arg." ++ catToNT cat ++ "()"
         , indentStr 2 $ "const data =" +++ buildItemFn ++ "(item)"
         , indentStr 2 $ "return [data].concat(" ++ fnName ++ "(" ++ "list" ++ ")"++ ")"
         , "}"
         ]
       where
-        itemName = mixedCase_ (show cat)
-        buildItemFn = mkBuildFnName cat
-        listName = mixedCase_ catid
+        buildItemFn = mkBuildFnName itemCat
 
-    mkOneListCheck cat =
+    mkOneListCheck itemCat =
         [ "if (arg instanceof" +++ catid ++ "_AppendLastContext) {"
-        , indentStr 2 $ "const item = arg." ++ itemName ++ "()"
+        , indentStr 2 $ "const item = arg." ++ catToNT itemCat ++ "()"
         , indentStr 2 $ "const data =" +++ buildItemFn ++ "(item)"
         , indentStr 2 "return [data]"
         , "}"
         ]
       where
-        itemName = mixedCase_ (show cat)
-        buildItemFn = mkBuildFnName cat
+        buildItemFn = mkBuildFnName itemCat
 
     mkEmptyListCheck =
       [ "if (arg instanceof" +++ catid ++ "_EmptyContext) {"
