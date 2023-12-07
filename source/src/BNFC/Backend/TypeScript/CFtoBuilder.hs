@@ -1,14 +1,19 @@
+{-# LANGUAGE TupleSections #-}
+
 module BNFC.Backend.TypeScript.CFtoBuilder where
 
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
-import Data.Bifunctor (Bifunctor(second))
-import Data.List (intercalate)
+import Data.Bifunctor (Bifunctor(second, first))
+import Data.List (intercalate, nubBy, nub)
 
 import BNFC.Utils ((+++), camelCase_, mixedCase_)
-import BNFC.CF (CF, Cat (ListCat, TokenCat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun), getAbstractSyntax, Data, catOfList, isTokenCat, catToStr)
-import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, withOccurences, getTokenCats, catToTsType)
+import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun), getAbstractSyntax, Data, catOfList, isTokenCat, catToStr, ruleGroups, Rule, Rul (rhsRule, funRule), SentForm, RString, WithPosition (wpThing))
+import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, withOccurences, getTokenCats, catToTsType, toMixedCase, reservedTokenCats)
 import BNFC.Options (SharedOptions (lang))
-import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
+import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT, antlrRuleLabel)
+import Data.Either (lefts)
+
+type DataGroup = (Cat, [(RString, SentForm)])
 
 cfToBuilder :: CF -> SharedOptions -> Doc
 cfToBuilder cf opts = vcat $ concat
@@ -21,12 +26,18 @@ cfToBuilder cf opts = vcat $ concat
   ]
     where
       datas = getAbstractSyntax cf
-      buildFnDecls = map text $ intercalate [""] (map mkBuildFunction datas)
-
-      importDecls = map text $ mkImportDecls datas (lang opts)
+      importDecls = map text $ mkImportDecls fullData (lang opts)
 
       tokenDecls = map text $ intercalate [""] $ map mkBuildTokenFunction allTokenCats
+      buildFnDecls = map text $ intercalate [""] (map mkBuildFunction datas)
       allTokenCats = getTokenCats datas
+
+      groups = ruleGroups cf
+      cats = map fst groups
+      rhsRules = map (map rhsRule . snd) groups
+      ruleLabels = map (map funRule . snd) groups
+      labelsWithRhsRules = zipWith zip ruleLabels rhsRules
+      fullData = zip cats labelsWithRhsRules
 
 mkThrowErrorStmt :: String -> Cat -> String
 mkThrowErrorStmt fnName cat = "throw '[" ++ fnName ++ "]" +++ "Error: arg should be an instance of" +++ identCat cat ++ "Context" ++ "'"
@@ -149,23 +160,6 @@ mkCtxType (cat, ruleLabels) = case cat of
     mkCtxName (Left cat) = camelCase_ $ identCat cat ++ "_context"
     mkCtxName (Right label) = camelCase_ $ label ++ "_context"
 
-mkImportDecls :: [Data] -> String -> [String]
-mkImportDecls datas lang = [ctxImportStmt, astImportStmt]
-  where
-    contextImports = intercalate ", " $ map (mkCtxType . excludeValues) datas
-
-    tokenTypes = map catToTsType (getTokenCats datas)
-    nonListCats = map fst $ filter (not . isList . fst) datas
-    catTypes = map catToTsType nonListCats
-
-    catsTypeNames = tokenTypes ++ catTypes
-    astImports = intercalate ", " catsTypeNames
-
-    ctxImportStmt = "import {" ++ contextImports ++ "} from './" ++ parserFile ++ "'"
-    astImportStmt = "import {" ++ astImports ++ "} from './abstract'"
-
-    parserFile = camelCase_ $ lang ++ "Parser"
-
 excludeValues :: Data -> (Cat, [String])
 excludeValues = second (map fst)
 
@@ -187,3 +181,33 @@ mkBuildFnName cat = mixedCase_ ("build_" ++ restName)
       ListCat cat  -> catToStr cat ++ "List"
       TokenCat cat -> cat ++ "Token"
       otherCat     -> catToStr otherCat
+
+mkImportDecls :: [DataGroup] -> String -> [String]
+mkImportDecls groups lang = [ctxImportStmt, astImportStmt]
+  where
+    groupsWithoutPos = map (second (map (first wpThing))) groups
+    ctxNames = concatMap (\(cat, rules) -> identCat cat : map (antlrRuleLabel cat . fst) rules) groupsWithoutPos
+    ctxImports = intercalate ", " $ nub $ map (++ "Context") ctxNames
+
+    tokenImports = map catToTsType (getTokenCatsFromGroup groups)
+    astNames = nub $ tokenImports ++ (concatMap (\(cat, rules) -> catToTsType cat : map (toMixedCase . fst) rules) $ filter (isUsualCat . fst) groupsWithoutPos)
+    astImports = intercalate ", " (filter (not . null) astNames)
+
+    ctxImportStmt = "import {" ++ ctxImports ++ "} from './" ++ parserFile ++ "'"
+    astImportStmt = "import {" ++ astImports ++ "} from './abstract'"
+
+    parserFile = camelCase_ $ lang ++ "Parser"
+
+    isUsualCat (Cat _) = True
+    isUsualCat _       = False
+
+getTokenCatsFromGroup :: [DataGroup] -> [Cat]
+getTokenCatsFromGroup groups = nubBy tokenCatComparator allTokenCats
+  where
+    allTokenCats = reservedTokenCats ++ allUserTokenCats
+    allUserTokenCats = filter isTokenCat allCats
+    allCats = concatMap (concatMap (lefts . snd) . snd) groups
+
+    tokenCatComparator :: Cat -> Cat -> Bool
+    tokenCatComparator (TokenCat c1) (TokenCat c2) = c1 == c2
+    tokenCatComparator _ _ = False

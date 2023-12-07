@@ -38,7 +38,7 @@ dataToAbstract (cat, rules) = vcat
 
 mkRuleDecl :: (String, [Cat]) -> Doc
 mkRuleDecl (ruleName, cats) = vcat $ concat
-    [ [ text $ "export type" +++ toMixedCase typeName ++ " = {"
+    [ [ text $ "export type" +++ typeName ++ " = {"
       , indent 2 $ "type:" +++ wrapSQ ruleName
       ]
     , valuesList
