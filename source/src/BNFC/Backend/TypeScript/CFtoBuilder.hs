@@ -74,11 +74,11 @@ mkImportDecls :: [DataGroup] -> String -> [String]
 mkImportDecls groups lang = [ctxImportStmt, astImportStmt]
   where
     groupsWithoutPos = map (second (map (first wpThing))) groups
-    ctxNames = concatMap (\(cat, rules) -> identCat cat : map (antlrRuleLabel cat . fst) rules) groupsWithoutPos
+    ctxNames = concatMap (\(cat, rules) -> identCat cat : zipWith (\(fun, _) idx -> antlrRuleLabel cat fun (Just idx)) rules [1..]) groupsWithoutPos
     ctxImports = intercalate ", " $ nub $ map (++ "Context") ctxNames
 
     tokenImports = map catToTsType (getTokenCatsFromGroup groups)
-    astNames = nub $ tokenImports ++ (concatMap (\(cat, rules) -> catToTsType cat : map (toMixedCase . fst) rules) $ filter (isUsualCat . fst) groupsWithoutPos)
+    astNames = nub $ tokenImports ++ (map (\(cat, _) -> catToTsType cat) $ filter (isUsualCat . fst) groupsWithoutPos)
     astImports = intercalate ", " (filter (not . null) astNames)
 
     ctxImportStmt = "import {" ++ ctxImports ++ "} from './" ++ parserFile ++ "'"
@@ -114,13 +114,14 @@ mkBuildFunction (cat, rhsRules) =
 
     mkIfStmt :: (String, SentForm) -> Integer -> [String]
     mkIfStmt (ruleLabel, rhsRule) ifIdx =
-        [indentStr 2 $ "if (arg instanceof" +++ antlrRuleLabel cat ruleLabel ++"Context) {"]
+        [indentStr 2 $ "if (arg instanceof" +++ antlrRuleLabel cat ruleLabel antlrRuleLabelIdx ++ "Context) {"]
         ++
         mkIfBody ruleLabel
         ++
         [indentStr 2 "}"]
 
       where
+        antlrRuleLabelIdx = if isCoercion ruleLabel then Just ifIdx else Nothing
         rhsRuleWithIdx = mapMaybe (\(rule, idx) -> either (\cat -> Just (cat, idx)) (\_ -> Nothing) rule) $ zip rhsRule [1..]
         mkPattern idx = "_p_" ++ show ifIdx ++ "_" ++ show idx
 
