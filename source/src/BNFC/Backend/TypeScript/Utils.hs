@@ -32,10 +32,7 @@ getOccurences :: Eq a => a -> [a] -> Int
 getOccurences item list = length $ filter (==item) list
 
 catToTsType :: Cat -> String
-catToTsType (ListCat c) = "Array<" ++ listItem ++ ">"
-  where
-    listItem = toMixedCase (catToTsType c)
-
+catToTsType (ListCat c) = "Array<" ++ catToTsType c ++ ">"
 catToTsType (TokenCat c) = toMixedCase (c ++ "Token")
 catToTsType cat = toMixedCase (catToStr cat)
 
