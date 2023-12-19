@@ -80,7 +80,7 @@ makeTypeScript opts@Options{..} cf = do
       , "const tokens = new CommonTokenStream(lexer)"
       , "const parser = new " ++ parserClassName ++ "(tokens)"
       , "const tree =" +++ rootBuildFnName ++ "(parser." ++ catToNT rootCat ++ "())"
-      , "console.log(tree)"
+      , "console.dir(tree, {depth: 6})"
       , ""
       ]
     rootBuildFnName = mkBuildFnName rootCat

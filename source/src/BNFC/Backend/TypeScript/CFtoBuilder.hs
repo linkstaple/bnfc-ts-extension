@@ -8,7 +8,7 @@ import Data.List (intercalate, nubBy, nub)
 
 import BNFC.Utils ((+++), camelCase_)
 import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), getAbstractSyntax, isTokenCat, catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, RString, WithPosition (wpThing))
-import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, getTokenCats, catToTsType, toMixedCase, reservedTokenCats)
+import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, getTokenCats, catToTsType, reservedTokenCats)
 import BNFC.Options (SharedOptions (lang))
 import BNFC.Backend.Antlr.CFtoAntlr4Parser (antlrRuleLabel, makeLeftRecRule)
 import Data.Either (lefts)
