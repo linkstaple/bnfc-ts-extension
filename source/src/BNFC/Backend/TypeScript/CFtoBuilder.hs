@@ -151,12 +151,17 @@ mkBuildFunction (cat, rhsRules) =
         consListBody =
             [ indentStr 4 $ "const value1 =" +++  mkBuildFnName firstCat ++ "(arg." ++ mkPattern firstIdx ++ ")"
             , indentStr 4 $ "const value2 =" +++  mkBuildFnName secondCat ++ "(arg." ++ mkPattern secondIdx ++ ")"
-            , indentStr 4 "return [" ++ itemVar ++ "].concat(" ++ listVar ++ ")"
+            , indentStr 4 $ "return" +++ resultList
             ]
           where
             (firstCat, firstIdx) = head rhsRuleWithIdx
             (secondCat, secondIdx) = rhsRuleWithIdx !! 1
             (itemVar, listVar) = if isList firstCat then ("value2", "value1") else ("value1", "value2")
+            resultList = if isList firstCat
+              then
+                "[..." ++ listVar ++ ", " ++ itemVar ++ "]"
+              else
+                "[" ++ itemVar ++ ", ..." ++ listVar ++ "]"
 
 firstUpperCase :: String -> String
 firstUpperCase "" = ""
