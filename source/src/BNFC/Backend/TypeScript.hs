@@ -3,7 +3,7 @@
 module BNFC.Backend.TypeScript ( makeTypeScript ) where
 
 import Prelude hiding ((<>))
-import Text.PrettyPrint ( text, vcat, Doc, render )
+import Text.PrettyPrint ( text, vcat, render )
 import System.FilePath ((</>), pathSeparator)
 import System.Directory ( createDirectoryIfMissing )
 import Data.Char (toLower)
@@ -17,6 +17,7 @@ import BNFC.Backend.Common.Makefile as MakeFile
 import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
 import BNFC.Backend.TypeScript.CFtoBuilder (cfToBuilder, mkBuildFnName)
 import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
+import BNFC.Backend.TypeScript.Utils (indent)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
 makeTypeScript opts@Options{..} cf = do
@@ -126,10 +127,6 @@ makeTypeScript opts@Options{..} cf = do
 
 makeTsComment :: String -> String
 makeTsComment = ("// -- TypeScript -- " ++)
-
--- add N spaces before line
-indent :: Int -> String -> Doc
-indent size = text . (replicate size ' ' ++)
 
 toLowerCase :: String -> String
 toLowerCase = map toLower

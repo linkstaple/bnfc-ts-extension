@@ -3,6 +3,7 @@ module BNFC.Backend.TypeScript.Utils where
 import BNFC.CF (Cat (TokenCat, ListCat), catToStr, Data, isTokenCat)
 import BNFC.Utils (mkName, NameStyle (MixedCase))
 import Data.List (nubBy)
+import Text.PrettyPrint (Doc, text)
 
 -- wrap string into single quotes
 wrapSQ :: String -> String
@@ -15,21 +16,12 @@ catToTypeName cat = case cat of
   ListCat c  -> catToTypeName c ++ "List"
   c          -> show c
 
+-- indent string with N spaces
 indentStr :: Int -> String -> String
 indentStr size = (replicate size ' ' ++)
 
-withOccurences :: Eq a => [a] -> [(a, Int, Bool)]
-withOccurences list = reverse $ map (\(a, occ) -> (a, occ - 1, totalOccurences a == 1)) indexedArr
-  where
-    totalOccurences = flip getOccurences list
-
-    indexedArr = foldl foldFn [] list
-    foldFn list item = (item, newCount) : list
-      where
-        newCount = getOccurences item (map fst list) + 1
-
-getOccurences :: Eq a => a -> [a] -> Int
-getOccurences item list = length $ filter (==item) list
+indent :: Int -> String -> Doc
+indent size str = text (indentStr size str)
 
 catToTsType :: Cat -> String
 catToTsType (ListCat c) = "Array<" ++ catToTsType c ++ ">"

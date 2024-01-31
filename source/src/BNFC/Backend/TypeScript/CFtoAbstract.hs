@@ -5,7 +5,7 @@ import Data.List (intercalate, intersperse)
 
 import BNFC.CF (CF, Data, getAbstractSyntax, catToStr, isList, Cat)
 import BNFC.Utils
-import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, getTokenCats, catToTsType)
+import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, getTokenCats, catToTsType, indent)
 
 type TypeName = String
 
@@ -54,10 +54,6 @@ mkUnion :: TypeName -> [TypeName] -> Doc
 mkUnion typeName typeNames = text typeDecl
   where
     typeDecl = "export type" +++ typeName ++ " = " ++ intercalate " | " typeNames
-
--- indent string with N spaces
-indent :: Int -> String -> Doc
-indent size = text . (replicate size ' ' ++)
 
 -- valueType is a string which represents TS basic type
 mkToken :: Cat -> [String]
