@@ -4,8 +4,8 @@ import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 import Data.List (intercalate, intersperse)
 
 import BNFC.CF (CF, Data, getAbstractSyntax, catToStr, isList, Cat)
-import BNFC.Utils
-import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, getTokenCats, catToTsType, indent)
+import BNFC.Utils ( (+++) )
+import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, getTokenCats, catToTsType, indent, getVarsFromCats)
 
 type TypeName = String
 
@@ -45,8 +45,10 @@ mkRuleDecl (ruleName, cats) = vcat $ concat
     , ["}"]
     ]
   where
-    valuesList = map (indent 2) $ zipWith (\num cat -> "value_" ++ show num ++ ": " ++ catToTsType cat) [1..] cats
+    valuesList = map (indent 2) $ zipWith (\varName varType -> concat [varName, ": ", varType]) varNames varTypes
     typeName = toMixedCase ruleName
+    varNames = getVarsFromCats cats
+    varTypes = map catToTsType cats
 
 -- makes TypeScript union
 -- mkUnion "Either" ["Left", "Right"] --> type Either = Left | Right

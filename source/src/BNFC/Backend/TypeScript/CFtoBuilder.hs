@@ -8,12 +8,12 @@ import Data.List (intercalate, nubBy, nub)
 
 import BNFC.Utils ((+++), camelCase_)
 import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), getAbstractSyntax, isTokenCat, catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, RString, WithPosition (wpThing))
-import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, getTokenCats, catToTsType, reservedTokenCats)
+import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, getTokenCats, catToTsType, reservedTokenCats, getVarsFromCats)
 import BNFC.Options (SharedOptions (lang))
 import BNFC.Backend.Antlr.CFtoAntlr4Parser (antlrRuleLabel, makeLeftRecRule)
 import Data.Either (lefts)
 import Data.Maybe (mapMaybe)
-import Data.Char (toUpper)
+import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 
 type DataGroup = (Cat, [(RString, SentForm)])
 
@@ -131,20 +131,23 @@ mkBuildFunction (cat, rhsRules) =
           | isOneFun ruleLabel   = oneListBody
           | isConsFun ruleLabel  = consListBody
           | otherwise            =
-            concat
-              [ zipWith
-             (\ (cat, idx) valueIndex
-                -> indentStr 4
-                     $ "const value_" ++ show valueIndex
-                         +++ "=" +++ mkBuildFnName cat ++ "(arg." ++ mkPattern idx ++ ")")
-                          rhsRuleWithIdx [1 .. ]
-              , [ indentStr 4 "return {"]
-              , [ indentStr 6 $ "type: " ++ wrapSQ ruleLabel ++ ","]
-              , map
-                  (\ valueIndex -> indentStr 6 ("value_" ++ show valueIndex ++ ","))
-                  [1 .. length rhsRuleWithIdx]
-              , [ indentStr 4 "}" ]
-              ]
+              concat
+                [ zipWith
+              (\ (cat, idx) varName
+                  -> indentStr 4
+                      $ "const" +++ varName
+                          +++ "=" +++ mkBuildFnName cat ++ "(arg." ++ mkPattern idx ++ ")")
+                            rhsRuleWithIdx varNames
+                , [ indentStr 4 "return {"]
+                , [ indentStr 6 $ "type: " ++ wrapSQ ruleLabel ++ ","]
+                , map
+                    (\ varName -> indentStr 6 (varName ++ ","))
+                    varNames
+                , [ indentStr 4 "}" ]
+                ]
+            where
+              varNames = getVarsFromCats rhsCats
+              rhsCats = map fst rhsRuleWithIdx
 
         emptyListBody = [indentStr 4 "return []"]
         oneListBody = map (\(cat, idx) -> indentStr 4 $ "const data =" +++ mkBuildFnName cat ++ "(arg." ++ mkPattern idx ++ ")") rhsRuleWithIdx ++ [ indentStr 4 "return [data]"]
@@ -162,7 +165,3 @@ mkBuildFunction (cat, rhsRules) =
                 "[..." ++ listVar ++ ", " ++ itemVar ++ "]"
               else
                 "[" ++ itemVar ++ ", ..." ++ listVar ++ "]"
-
-firstUpperCase :: String -> String
-firstUpperCase "" = ""
-firstUpperCase (a:b) = toUpper a : b
