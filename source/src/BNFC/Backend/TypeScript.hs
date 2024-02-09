@@ -12,11 +12,12 @@ import BNFC.Backend.Base (MkFiles, mkfile,liftIO)
 import BNFC.CF (CF, getAbstractSyntax)
 import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage, antlrOpts, outDir), AntlrTarget (TS))
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
-import BNFC.Backend.Antlr (makeAntlr)
 import BNFC.Backend.Common.Makefile as MakeFile
+import BNFC.Backend.Antlr (makeAntlr)
+import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
 import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
 import BNFC.Backend.TypeScript.CFtoBuilder (cfToBuilder, mkBuildFnName)
-import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
+import BNFC.Backend.TypeScript.CFtoPrinter (cfToPrinter)
 import BNFC.Backend.TypeScript.Utils (indent)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
@@ -36,11 +37,13 @@ makeTypeScript opts@Options{..} cf = do
 
     mkfile (dirBase </> "abstract.ts") makeTsComment abstractContent
     mkfile (dirBase </> "builder.ts") makeTsComment builderContent
+    mkfile (dirBase </> "printer.ts") makeTsComment printerContent
 
   where
     abstractContent = cfToAbstract cf
     datas = getAbstractSyntax cf
     builderContent = cfToBuilder cf opts
+    printerContent = cfToPrinter cf
     pkgName = mkName [] CamelCase lang
     pkgToDir = replace '.' pathSeparator
 
