@@ -37,7 +37,7 @@ makeTypeScript opts@Options{..} cf = do
 
     mkfile (dirBase </> "abstract.ts") makeTsComment abstractContent
     mkfile (dirBase </> "builder.ts") makeTsComment builderContent
-    mkfile (dirBase </> "printer.ts") makeTsComment printerContent
+    -- mkfile (dirBase </> "printer.ts") makeTsComment printerContent
 
   where
     abstractContent = cfToAbstract cf
