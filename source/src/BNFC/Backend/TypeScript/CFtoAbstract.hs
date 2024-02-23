@@ -1,11 +1,11 @@
-module BNFC.Backend.TypeScript.CFtoAbstract where
+module BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract) where
 
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 import Data.List (intercalate, intersperse)
 
-import BNFC.CF (CF, Data, getAbstractSyntax, catToStr, isList, Cat)
+import BNFC.CF (CF, Data, getAbstractSyntax, isList, Cat (TokenCat), catInteger, catDouble, literals)
 import BNFC.Utils ( (+++) )
-import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, getTokenCats, catToTsType, indent, getVarsFromCats)
+import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, catToTsType, indent, getVarsFromCats, mkTokenNodeName)
 
 type TypeName = String
 
@@ -22,8 +22,8 @@ cfToAbstract cf = vcat $ concat
     datasWithoutLists = filter (not . isList . fst) datas
     abstractNodes = map dataToAbstract datasWithoutLists
 
-    allTokenCats = getTokenCats datas
-    tokensDecl = concatMap (map text . mkToken) allTokenCats
+    allTokenNames = literals cf
+    tokensDecl = concatMap (map text . mkTokenDecl) allTokenNames
 
 dataToAbstract :: Data -> Doc
 dataToAbstract (cat, rules) = vcat
@@ -58,13 +58,13 @@ mkUnion typeName typeNames = text typeDecl
     typeDecl = "export type" +++ typeName ++ " = " ++ intercalate " | " typeNames
 
 -- valueType is a string which represents TS basic type
-mkToken :: Cat -> [String]
-mkToken tokenCat =
-    [ "export type" +++ catToTsType tokenCat ++ " = {"
-    , indentStr 2 $ "type: " ++ wrapSQ (catToStr tokenCat ++ "Token")
+mkTokenDecl :: String -> [String]
+mkTokenDecl tokenName =
+    [ "export type" +++ catToTsType (TokenCat tokenName) ++ " = {"
+    , indentStr 2 $ "type: " ++ mkTokenNodeName tokenName
     , indentStr 2 $ "value: " ++ value
     , "}"
     ]
 
   where
-    value = if catToStr tokenCat `elem` ["Integer", "Double"] then "number" else "string"
+    value = if tokenName `elem` [catInteger, catDouble] then "number" else "string"

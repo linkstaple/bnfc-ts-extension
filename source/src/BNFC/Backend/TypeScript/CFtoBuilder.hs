@@ -1,21 +1,18 @@
-{-# LANGUAGE TupleSections #-}
-
 module BNFC.Backend.TypeScript.CFtoBuilder where
 
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
-import Data.Bifunctor (Bifunctor(second, first))
-import Data.List (intercalate, nubBy, nub)
+import Data.Bifunctor (Bifunctor(second))
+import Data.List (intercalate, nub)
 
 import BNFC.Utils ((+++), camelCase_)
-import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), getAbstractSyntax, isTokenCat, catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, RString, WithPosition (wpThing))
-import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, getTokenCats, catToTsType, reservedTokenCats, getVarsFromCats)
+import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, RString, WithPosition (wpThing), literals)
+import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, catToTsType, getVarsFromCats, mkTokenNodeName)
 import BNFC.Options (SharedOptions (lang))
 import BNFC.Backend.Antlr.CFtoAntlr4Parser (antlrRuleLabel, makeLeftRecRule)
-import Data.Either (lefts)
 import Data.Maybe (mapMaybe)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 
-type DataGroup = (Cat, [(RString, SentForm)])
+type RuleData = (Cat, [(String, SentForm)])
 
 cfToBuilder :: CF -> SharedOptions -> Doc
 cfToBuilder cf opts = vcat $ concat
@@ -27,19 +24,16 @@ cfToBuilder cf opts = vcat $ concat
   , buildFnDecls
   ]
     where
-      datas = getAbstractSyntax cf
-      importDecls = map text $ mkImportDecls fullData (lang opts)
+      importDecls = map text $ mkImportDecls cf (lang opts)
 
-      tokenDecls = map text $ intercalate [""] $ map mkBuildTokenFunction allTokenCats
-      buildFnDecls = map text $ intercalate [""] (map mkBuildFunction fullData)
-      allTokenCats = getTokenCats datas
+      tokenDecls = map text $ intercalate [""] buildTokensFuns
+      buildFnDecls = map text $ intercalate [""] buildFuns
 
-      groups = map (second (map (makeLeftRecRule cf))) $ ruleGroups cf
-      cats = map fst groups
-      rhsRules = map (map rhsRule . snd) groups
-      ruleLabels = map (map funRule . snd) groups
-      labelsWithRhsRules = zipWith zip ruleLabels rhsRules
-      fullData = zip cats labelsWithRhsRules
+      buildFuns =  map mkBuildFunction datas
+      buildTokensFuns = map mkBuildTokenFunction allTokenCats
+
+      allTokenCats = map TokenCat (literals cf)
+      datas = cfToGroups cf
 
 mkThrowErrorStmt :: Cat -> String
 mkThrowErrorStmt cat = "throw new Error('[" ++ mkBuildFnName cat ++ "]" +++ "Error: arg should be an instance of" +++ camelCase_ (identCat cat) ++ "Context" ++ "')"
@@ -48,7 +42,7 @@ mkBuildTokenFunction :: Cat -> [String]
 mkBuildTokenFunction tokenCat =
   [ "export function" +++ fnName ++ "(arg: Token):" +++ returnType +++ "{"
   , indentStr 2 "return {"
-  , indentStr 4 $ "type:" +++ wrapSQ (tokenName ++ "Token") ++ ","
+  , indentStr 4 $ "type:" +++ mkTokenNodeName tokenName ++ ","
   , indentStr 4 $ "value:" +++ value
   , indentStr 2 "}"
   , "}"
@@ -70,15 +64,15 @@ mkBuildFnName cat = "build" ++ firstUpperCase restName
       TokenCat cat -> cat ++ "Token"
       otherCat     -> catToStr otherCat
 
-mkImportDecls :: [DataGroup] -> String -> [String]
-mkImportDecls groups lang = [ctxImportStmt, astImportStmt]
+mkImportDecls :: CF -> String -> [String]
+mkImportDecls cf lang = [ctxImportStmt, astImportStmt]
   where
-    groupsWithoutPos = map (second (map (first wpThing))) groups
-    ctxNames = concatMap (\(cat, rules) -> identCat cat : zipWith (\(fun, _) idx -> antlrRuleLabel cat fun (Just idx)) rules [1..]) groupsWithoutPos
+    groups = cfToGroups cf
+    ctxNames = concatMap (\(cat, rules) -> identCat cat : zipWith (\(fun, _) idx -> antlrRuleLabel cat fun (Just idx)) rules [1..]) groups
     ctxImports = intercalate ", " $ nub $ map (++ "Context") ctxNames
 
-    tokenImports = map catToTsType (getTokenCatsFromGroup groups)
-    astNames = nub $ tokenImports ++ (map (\(cat, _) -> catToTsType cat) $ filter (isUsualCat . fst) groupsWithoutPos)
+    tokenImports = map (catToTsType . TokenCat) (literals cf)
+    astNames = nub $ tokenImports ++ (map (\(cat, _) -> catToTsType cat) $ filter (isUsualCat . fst) groups)
     astImports = intercalate ", " (filter (not . null) astNames)
 
     ctxImportStmt = "import {" ++ ctxImports ++ "} from './" ++ parserFile ++ "'"
@@ -89,19 +83,8 @@ mkImportDecls groups lang = [ctxImportStmt, astImportStmt]
     isUsualCat (Cat _) = True
     isUsualCat _       = False
 
-getTokenCatsFromGroup :: [DataGroup] -> [Cat]
-getTokenCatsFromGroup groups = nubBy tokenCatComparator allTokenCats
-  where
-    allTokenCats = reservedTokenCats ++ allUserTokenCats
-    allUserTokenCats = filter isTokenCat allCats
-    allCats = concatMap (concatMap (lefts . snd) . snd) groups
-
-    tokenCatComparator :: Cat -> Cat -> Bool
-    tokenCatComparator (TokenCat c1) (TokenCat c2) = c1 == c2
-    tokenCatComparator _ _ = False
-
-mkBuildFunction :: DataGroup -> [String]
-mkBuildFunction (cat, rhsRules) =
+mkBuildFunction :: RuleData -> [String]
+mkBuildFunction (cat, rulesWithLabels) =
   [ "export function" +++ mkBuildFnName cat ++ "(arg: " ++ identCat cat ++ "Context):" +++ catToTsType cat +++ "{"]
   ++
   concatMap (uncurry mkIfStmt) datas
@@ -110,7 +93,7 @@ mkBuildFunction (cat, rhsRules) =
   , "}"
   ]
   where
-    datas = zipWith (\rhsRule index -> (first wpThing rhsRule, index)) rhsRules [1..]
+    datas = zip rulesWithLabels [1..]
 
     mkIfStmt :: (String, SentForm) -> Integer -> [String]
     mkIfStmt (ruleLabel, rhsRule) ifIdx =
@@ -165,3 +148,8 @@ mkBuildFunction (cat, rhsRules) =
                 "[..." ++ listVar ++ ", " ++ itemVar ++ "]"
               else
                 "[" ++ itemVar ++ ", ..." ++ listVar ++ "]"
+
+cfToGroups :: CF -> [RuleData]
+cfToGroups cf = map (second (map (ruleToData . makeLeftRecRule cf))) $ ruleGroups cf
+  where
+    ruleToData rule = ((wpThing . funRule) rule, rhsRule rule)

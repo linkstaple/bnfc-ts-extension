@@ -1,8 +1,7 @@
 module BNFC.Backend.TypeScript.Utils where
 
-import BNFC.CF (Cat (TokenCat, ListCat), catToStr, Data, isTokenCat, normCat)
+import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat)
 import BNFC.Utils (mkName, NameStyle (MixedCase, LowerCase), mkNames)
-import Data.List (nubBy)
 import Text.PrettyPrint (Doc, text)
 import BNFC.Backend.Common.NamedVariables (getVars)
 import Data.Char (toLower, isDigit)
@@ -76,17 +75,6 @@ reservedTokenCats =
 reservedTokenNames :: [String]
 reservedTokenNames = map catToStr reservedTokenCats
 
-getTokenCats :: [Data] -> [Cat]
-getTokenCats datas = nubBy tokenCatComparator allTokenCats
-  where
-    allTokenCats = reservedTokenCats ++ allUserTokenCats
-    allUserTokenCats = filter isTokenCat allCats
-    allCats = concatMap (concatMap snd . snd) datas
-
-    tokenCatComparator :: Cat -> Cat -> Bool
-    tokenCatComparator (TokenCat c1) (TokenCat c2) = c1 == c2
-    tokenCatComparator _ _ = False
-
 getVarsFromCats :: [Cat] -> [String]
 -- "type" is reserved for identification of AST node
 getVarsFromCats cats = map normalizeSuffix varNames
@@ -106,3 +94,6 @@ getVarsFromCats cats = map normalizeSuffix varNames
     normalizeSuffix varName = if isDigit lastChar then init varName ++ "_" ++ [lastChar] else varName
       where
         lastChar = last varName
+
+mkTokenNodeName :: String -> String
+mkTokenNodeName tokenName = wrapSQ (tokenName ++ "Token")
