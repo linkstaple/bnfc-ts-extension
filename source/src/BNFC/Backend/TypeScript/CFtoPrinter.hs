@@ -1,38 +1,41 @@
 module BNFC.Backend.TypeScript.CFtoPrinter (cfToPrinter) where
-import BNFC.CF (CF, getAbstractSyntax, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, TokenCat), identCat, literals, allParserCats, rulesForCat, WithPosition (wpThing), isList, allParserCatsNorm, IsFun (isCoercion), catToStr)
+import BNFC.CF (CF, getAbstractSyntax, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, TokenCat), literals, WithPosition (wpThing), isList, allParserCatsNorm, IsFun (isCoercion), catToStr, SentForm, rulesForNormalizedCat)
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
-import Data.Bifunctor (second)
-import BNFC.Utils ((+++), camelCase_)
-import BNFC.Backend.TypeScript.Utils (catToTsType, indent, indentStr, wrapSQ, mkTokenNodeName)
+import BNFC.Utils ((+++))
+import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, mkTokenNodeName, getVarsFromCats, toMixedCase)
 import Data.List (nub, intercalate)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
+import Data.Either (lefts)
 
 cfToPrinter :: CF -> Doc
 cfToPrinter cf = vcat
   [ importsDecl
   , tokenPrinterDecl
-  , nodesPrinterDecl
-  , rulesPrintersDecls
+  , treePrinterDecl
+  , nodePrinterDecls
   ]
     where
-      importsDecl = text $ mkImportDecls cf
+      importsDecl = mkImportDecls cf
       tokenPrinterDecl = mkTokenPrinter cf
-      nodesPrinterDecl = mkNodesPrinter cf
+      treePrinterDecl = mkNodesPrinter cf
 
-      rulesPrintersDecls = vcat $ map (mkNodePrinter cf) cats
+      nodePrinterDecls = vcat $ map (mkNodePrinter cf) cats
 
-      cats = filter (not . isList) $ map fst $ getAbstractSyntax cf
+      cats = filter (not . isList) $
+              map fst (getAbstractSyntax cf)
 
-
-mkImportDecls :: CF -> String
-mkImportDecls cf = astImportStmt
+mkImportDecls :: CF -> Doc
+mkImportDecls cf = text astImportStmt
   where
     rulesCats = map fst (ruleGroups cf)
 
     tokenImports = map (catToTsType . TokenCat) (literals cf)
     catsImports = map catToTsType $ filter isUsualCat rulesCats
 
-    astNames = nub $ tokenImports ++ catsImports
+    rulesLabelsImports = concatMap (map (toMixedCase . fst) . snd) $
+              filter (not . isList . fst) $ getAbstractSyntax cf
+
+    astNames = nub $ tokenImports ++ catsImports ++ rulesLabelsImports
     astImports = intercalate ", " (filter (not . null) astNames)
 
     astImportStmt = "import {" ++ astImports ++ "} from './abstract'"
@@ -52,7 +55,7 @@ mkTokenPrinter cf = vcat
 
 mkNodesPrinter :: CF -> Doc
 mkNodesPrinter cf = vcat $
-  [ text $ "export function printNode(node: " ++ catsUnionType ++ "): string {"
+  [ text $ "export function printTree(node: " ++ catsUnionType ++ "): string {"
   , arrayCheck
   , tokenCheck
   ] ++
@@ -81,8 +84,7 @@ mkNodesPrinter cf = vcat $
 
       arrayCheck :: Doc = vcat
         [ indent 2 "if (Array.isArray(node)) {"
-        , indent 4 "// return node.map(printNode).join(',')"
-        , indent 4 "return ''"
+        , indent 4 "return node.map(printTree).join(', ')"
         , indent 2 "}"
         ]
 
@@ -99,28 +101,46 @@ mkNodePrinter :: CF -> Cat -> Doc
 mkNodePrinter cf cat = vcat $ concat
   [ [text $ "export function" +++ printFnName ++ "(node:" +++ catToTsType cat ++ "): string {" ]
   , rulesConditions
-  , [indent 2 $ "throw new Error('[" ++ mkPrintFnName cat ++ "]: Unkown node')"]
+  , [indent 2 $ "throw new Error(`[" ++ mkPrintFnName cat ++ "]: Unkown node`)"]
   , ["}"]
+  , rulesPrinters
   ]
-    where
-      rules = map (\rule -> (wpThing (funRule rule), rhsRule rule)) $ rulesForCat cf cat
-      filteredRules = filter (not . isCoercion . fst) rules
+    where      
+      rules = map (\rule -> (wpThing (funRule rule), rhsRule rule)) $
+                filter (not . isCoercion . funRule) $
+                rulesForNormalizedCat cf cat
 
-      rulesConditions = map mkIfStmt filteredRules
-      printFnName = mkPrintFnName cat
+      labels = map fst rules
+      rulesConditions = map mkIfStmt labels
+      rulesPrinters = map mkRulePrinter rules
 
-      mkIfStmt (label, _sentForm) = vcat
+      mkIfStmt label = vcat
         [ indent 2 $ "if (node.type === " ++ wrapSQ label ++ ") {"
-        , indent 4 "return ''"
+        , indent 4 $ "return print" ++ firstUpperCase label ++ "(node)"
         , indent 2 "}"
         ]
 
+      printFnName = mkPrintFnName cat
 
+mkRulePrinter :: (String, SentForm) -> Doc
+mkRulePrinter (ruleLabel, sentForm) = vcat
+  [ text $ "export function" +++ fnName ++ "(node:" +++ toMixedCase ruleLabel ++ "): string {"
+  , indent 2 $ "return `" ++ prettifiedRule ++ "`"
+  , "}"
+  ]
+    where
+      fnName = "print" ++ firstUpperCase ruleLabel
 
+      -- [Left True, Right "Hi", Left False] -> [Left (True, 0), Right "Hi", Left (False, 1)]
+      leftsIndexed :: [Either a b] -> Int -> [Either (a, Int) b]
+      leftsIndexed [] _ = []
+      leftsIndexed ((Right item) : others) currentIdx = Right item : leftsIndexed others currentIdx
+      leftsIndexed ((Left item) : others) currentIdx = Left (item, currentIdx) : leftsIndexed others (currentIdx + 1)
 
-mkRulePrinter :: CF -> Doc
-mkRulePrinter cf = text ""
+      varNames = getVarsFromCats (lefts sentForm)
+      sentFormWithVarNames = map (either (\(_, idx) -> "${printTree(node." ++ varNames !! idx ++ ")}") id) $ leftsIndexed sentForm 0
 
+      prettifiedRule = unwords sentFormWithVarNames
 
 mkPrintFnName :: Cat -> String
 mkPrintFnName cat = "print" ++ firstUpperCase (catToStr cat)
