@@ -1,6 +1,6 @@
 module BNFC.Backend.TypeScript.Utils where
 
-import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat)
+import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax)
 import BNFC.Utils (mkName, NameStyle (MixedCase, LowerCase), mkNames)
 import Text.PrettyPrint (Doc, text)
 import BNFC.Backend.Common.NamedVariables (getVars)
@@ -9,13 +9,6 @@ import Data.Char (toLower, isDigit)
 -- wrap string into single quotes
 wrapSQ :: String -> String
 wrapSQ str = "'" ++ str ++ "'"
-
--- convert category name to TS type name
-catToTypeName :: Cat -> String
-catToTypeName cat = case cat of 
-  TokenCat c -> c ++ "Token"
-  ListCat c  -> catToTypeName c ++ "List"
-  c          -> show c
 
 -- indent string with N spaces
 indentStr :: Int -> String -> String
@@ -94,6 +87,9 @@ getVarsFromCats cats = map normalizeSuffix varNames
     normalizeSuffix varName = if isDigit lastChar then init varName ++ "_" ++ [lastChar] else varName
       where
         lastChar = last varName
+
+getAbsynWithoutLists :: CF -> [Data]
+getAbsynWithoutLists = filter (not . isList . fst) . getAbstractSyntax
 
 mkTokenNodeName :: String -> String
 mkTokenNodeName tokenName = wrapSQ (tokenName ++ "Token")

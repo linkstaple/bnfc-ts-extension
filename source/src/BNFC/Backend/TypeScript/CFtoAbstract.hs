@@ -1,11 +1,11 @@
 module BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract) where
 
+import BNFC.CF (CF, Data, Cat (TokenCat), catInteger, catDouble, literals)
+import BNFC.Utils ( (+++) )
+import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, catToTsType, indent, getVarsFromCats, mkTokenNodeName, getAbsynWithoutLists)
+
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 import Data.List (intercalate, intersperse)
-
-import BNFC.CF (CF, Data, getAbstractSyntax, isList, Cat (TokenCat), catInteger, catDouble, literals)
-import BNFC.Utils ( (+++) )
-import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, catToTsType, indent, getVarsFromCats, mkTokenNodeName)
 
 type TypeName = String
 
@@ -16,11 +16,10 @@ cfToAbstract cf = vcat $ concat
     , intersperse (text "") abstractNodes
     ]
   where
-    datas = getAbstractSyntax cf
     -- we don't need to declare list types, because they will be
     -- referenced directly with Array<SomeType>
-    datasWithoutLists = filter (not . isList . fst) datas
-    abstractNodes = map dataToAbstract datasWithoutLists
+    absynData = getAbsynWithoutLists cf
+    abstractNodes = map dataToAbstract absynData
 
     allTokenNames = literals cf
     tokensDecl = concatMap (map text . mkTokenDecl) allTokenNames
