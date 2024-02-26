@@ -1,27 +1,32 @@
 module BNFC.Backend.TypeScript.Utils where
 
-import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax)
-import BNFC.Utils (mkName, NameStyle (MixedCase, LowerCase), mkNames)
 import Text.PrettyPrint (Doc, text)
-import BNFC.Backend.Common.NamedVariables (getVars)
+
 import Data.Char (toLower, isDigit)
 
--- wrap string into single quotes
+import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax)
+import BNFC.Utils (mkName, NameStyle (MixedCase, LowerCase), mkNames)
+import BNFC.Backend.Common.NamedVariables (getVars)
+
+-- | wrap string into single quotes.
 wrapSQ :: String -> String
 wrapSQ str = "'" ++ str ++ "'"
 
--- indent string with N spaces
+-- | indent string with N spaces.
 indentStr :: Int -> String -> String
 indentStr size = (replicate size ' ' ++)
 
+-- | indent string with N spaces and transform to Doc.
 indent :: Int -> String -> Doc
 indent size str = text (indentStr size str)
 
+-- | derive name for TS type from category.
 catToTsType :: Cat -> String
 catToTsType (ListCat c) = "Array<" ++ catToTsType c ++ ">"
 catToTsType (TokenCat c) = toMixedCase (c ++ "Token")
 catToTsType cat = toMixedCase (catToStr cat)
 
+-- | reserved TS keywords.
 reservedKeywords :: [String]
 reservedKeywords =
   [ "type"
@@ -68,8 +73,9 @@ reservedTokenCats =
 reservedTokenNames :: [String]
 reservedTokenNames = map catToStr reservedTokenCats
 
+-- | get variable names which will be used in node structure
+-- for categories used in production rule.
 getVarsFromCats :: [Cat] -> [String]
--- "type" is reserved for identification of AST node
 getVarsFromCats cats = map normalizeSuffix varNames
   where
     normalizedCats = map normCat cats
@@ -84,10 +90,14 @@ getVarsFromCats cats = map normalizeSuffix varNames
     varNames = mkNames ["type"] LowerCase normalizedVars
 
     normalizeSuffix :: String -> String
-    normalizeSuffix varName = if isDigit lastChar then init varName ++ "_" ++ [lastChar] else varName
+    normalizeSuffix varName
+        | isDigit lastChar = init varName ++ "_" ++ [lastChar]
+        | otherwise        = varName
       where
         lastChar = last varName
 
+-- | we don't need to declare nodes, which will represent list
+-- because they will be referenced directly with TS type Array<SomeType>.
 getAbsynWithoutLists :: CF -> [Data]
 getAbsynWithoutLists = filter (not . isList . fst) . getAbstractSyntax
 

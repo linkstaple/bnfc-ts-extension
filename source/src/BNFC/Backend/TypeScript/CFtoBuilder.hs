@@ -1,15 +1,16 @@
 module BNFC.Backend.TypeScript.CFtoBuilder where
 
-import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 import Data.Bifunctor (Bifunctor(second))
 import Data.List (intercalate, nub, intersperse)
+import Data.Maybe (mapMaybe)
+
+import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 
 import BNFC.Utils ((+++), camelCase_)
 import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, WithPosition (wpThing), literals)
 import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, catToTsType, getVarsFromCats, mkTokenNodeName, indent)
 import BNFC.Options (SharedOptions (lang))
 import BNFC.Backend.Antlr.CFtoAntlr4Parser (antlrRuleLabel, makeLeftRecRule)
-import Data.Maybe (mapMaybe)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 
 type RuleData = (Cat, [(String, SentForm)])
@@ -35,6 +36,7 @@ cfToBuilder cf opts = vcat $ intersperse (text "")
 mkThrowErrorStmt :: Cat -> String
 mkThrowErrorStmt cat = "throw new Error('[" ++ mkBuildFnName cat ++ "]" +++ "Error: arg should be an instance of" +++ camelCase_ (identCat cat) ++ "Context" ++ "')"
 
+-- | generates function code for building appropriate node for TokenCat.
 mkBuildTokenFunction :: Cat -> Doc
 mkBuildTokenFunction tokenCat = vcat
     [ text $ "export function" +++ fnName ++ "(arg: Token):" +++ returnType +++ "{"
@@ -53,6 +55,7 @@ mkBuildTokenFunction tokenCat = vcat
       "Double"  -> "parseFloat(arg.text)"
       _         -> "arg.text"
 
+-- | generate name for function which will build node for some cat.
 mkBuildFnName :: Cat -> String
 mkBuildFnName cat = "build" ++ firstUpperCase restName
   where
@@ -61,6 +64,7 @@ mkBuildFnName cat = "build" ++ firstUpperCase restName
       TokenCat cat -> cat ++ "Token"
       otherCat     -> catToStr otherCat
 
+-- | generates import declarations for antlr nodes and AST nodes.
 mkImportDecls :: CF -> String -> Doc
 mkImportDecls cf lang = vcat
     [ "import {Token} from 'antlr4'"

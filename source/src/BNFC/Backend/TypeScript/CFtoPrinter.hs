@@ -1,13 +1,14 @@
 module BNFC.Backend.TypeScript.CFtoPrinter (cfToPrinter) where
 
+import Data.Either (lefts)
+import Data.List (nub, intercalate)
+
+import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
+
 import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, TokenCat), literals, WithPosition (wpThing), allParserCatsNorm, IsFun (isCoercion), catToStr, SentForm, rulesForNormalizedCat)
 import BNFC.Utils ((+++))
 import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, mkTokenNodeName, getVarsFromCats, toMixedCase, getAbsynWithoutLists)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
-
-import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
-import Data.Either (lefts)
-import Data.List (nub, intercalate)
 
 cfToPrinter :: CF -> Doc
 cfToPrinter cf = vcat
@@ -22,9 +23,6 @@ cfToPrinter cf = vcat
     treePrinterDecl = mkNodesPrinter cf
 
     nodePrinterDecls = vcat $ map (mkNodePrinter cf) cats
-
-    -- we don't need to declare list types, because they will be
-    -- referenced directly with Array<SomeType>
     cats = map fst $ getAbsynWithoutLists cf
 
 mkImportDecls :: CF -> Doc
@@ -32,20 +30,21 @@ mkImportDecls cf = text astImportStmt
   where
     rulesCats = map fst (ruleGroups cf)
 
-    tokenImports = map (catToTsType . TokenCat) (literals cf)
-    catsImports = map catToTsType $ filter isUsualCat rulesCats
+    tokensTypeNames = map (catToTsType . TokenCat) (literals cf)
+    catsTypeNames = map catToTsType $ filter isUsualCat rulesCats
 
-    rulesLabelsImports = concatMap (map (toMixedCase . fst) . snd) $
+    labelsTypeNames = concatMap (map (toMixedCase . fst) . snd) $
                           getAbsynWithoutLists cf
 
-    astNames = nub $ tokenImports ++ catsImports ++ rulesLabelsImports
-    astImports = intercalate ", " (filter (not . null) astNames)
+    allTypeNames = nub $ tokensTypeNames ++ catsTypeNames ++ labelsTypeNames
+    astImports = intercalate ", " (filter (not . null) allTypeNames)
 
     astImportStmt = "import {" ++ astImports ++ "} from './abstract'"
 
     isUsualCat (Cat _) = True
     isUsualCat _       = False
 
+-- | generate function which will print user-defined and predefined tokens.
 mkTokenPrinter :: CF -> Doc
 mkTokenPrinter cf = vcat
     [ text $ "export function printToken(token: " ++ tokensUnionType ++ "): string {"
@@ -70,7 +69,8 @@ mkNodesPrinter cf = vcat $
   where
     allCats = allParserCatsNorm cf
     catsTypes = map catToTsType allCats
-    allTokenCats = map (catToTsType . TokenCat) $ literals cf
+    allTokens = literals cf
+    allTokenCats = map (catToTsType . TokenCat) allTokens
     catsUnionType = intercalate " | " $ allTokenCats ++ catsTypes
 
     nodeConditions = map mkNodeCondition $ getAbsynWithoutLists cf
@@ -90,7 +90,6 @@ mkNodesPrinter cf = vcat $
       , indent 2 "}"
       ]
 
-    allTokens = literals cf
     tokenComparisons = map (("node.type === " ++) . mkTokenNodeName) allTokens
     tokenCondition = intercalate " || " tokenComparisons
     tokenCheck :: Doc = vcat
@@ -146,4 +145,3 @@ mkRulePrinter (ruleLabel, sentForm) = vcat
 
 mkPrintFnName :: Cat -> String
 mkPrintFnName cat = "print" ++ firstUpperCase (catToStr cat)
-

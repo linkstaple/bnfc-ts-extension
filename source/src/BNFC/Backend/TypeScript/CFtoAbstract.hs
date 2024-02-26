@@ -1,11 +1,12 @@
 module BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract) where
 
+import Data.List (intercalate, intersperse)
+
+import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
+
 import BNFC.CF (CF, Data, Cat (TokenCat), catInteger, catDouble, literals)
 import BNFC.Utils ( (+++) )
 import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, catToTsType, indent, getVarsFromCats, mkTokenNodeName, getAbsynWithoutLists)
-
-import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
-import Data.List (intercalate, intersperse)
 
 type TypeName = String
 
@@ -16,8 +17,6 @@ cfToAbstract cf = vcat $ concat
     , intersperse (text "") abstractNodes
     ]
   where
-    -- we don't need to declare list types, because they will be
-    -- referenced directly with Array<SomeType>
     absynData = getAbsynWithoutLists cf
     abstractNodes = map dataToAbstract absynData
 
@@ -49,14 +48,15 @@ mkRuleDecl (ruleName, cats) = vcat $ concat
     varNames = getVarsFromCats cats
     varTypes = map catToTsType cats
 
--- makes TypeScript union
--- mkUnion "Either" ["Left", "Right"] --> type Either = Left | Right
+-- | makes TypeScript union.
+--
+-- mkUnion "a" ["b", "c"] --> type a = b | c
 mkUnion :: TypeName -> [TypeName] -> Doc
 mkUnion typeName typeNames = text typeDecl
   where
     typeDecl = "export type" +++ typeName ++ " = " ++ intercalate " | " typeNames
 
--- valueType is a string which represents TS basic type
+-- | valueType is a string which represents TS basic type.
 mkTokenDecl :: String -> [String]
 mkTokenDecl tokenName =
     [ "export type" +++ catToTsType (TokenCat tokenName) ++ " = {"
@@ -64,6 +64,8 @@ mkTokenDecl tokenName =
     , indentStr 2 $ "value: " ++ value
     , "}"
     ]
-
   where
-    value = if tokenName `elem` [catInteger, catDouble] then "number" else "string"
+    value =
+      if tokenName `elem` [catInteger, catDouble]
+        then "number"
+        else "string"
