@@ -7,7 +7,7 @@ import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 
 import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, TokenCat), literals, WithPosition (wpThing), allParserCatsNorm, IsFun (isCoercion), catToStr, SentForm, rulesForNormalizedCat)
 import BNFC.Utils ((+++))
-import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, mkTokenNodeName, getVarsFromCats, toMixedCase, getAbsynWithoutLists)
+import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, mkTokenNodeName, getVarsFromCats, toMixedCase, getAbsynWithoutLists, getAllTokenTypenames)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 
 cfToPrinter :: CF -> Doc
@@ -30,7 +30,7 @@ mkImportDecls cf = text astImportStmt
   where
     rulesCats = map fst (ruleGroups cf)
 
-    tokensTypeNames = map (catToTsType . TokenCat) (literals cf)
+    tokensTypeNames = getAllTokenTypenames cf
     catsTypeNames = map catToTsType $ filter isUsualCat rulesCats
 
     labelsTypeNames = concatMap (map (toMixedCase . fst) . snd) $
@@ -68,10 +68,9 @@ mkNodesPrinter cf = vcat $
     ]
   where
     allCats = allParserCatsNorm cf
-    catsTypes = map catToTsType allCats
-    allTokens = literals cf
-    allTokenCats = map (catToTsType . TokenCat) allTokens
-    catsUnionType = intercalate " | " $ allTokenCats ++ catsTypes
+    catsTypenames = map catToTsType allCats
+    allTokenTypenames = getAllTokenTypenames cf
+    catsUnionType = intercalate " | " $ allTokenTypenames ++ catsTypenames
 
     nodeConditions = map mkNodeCondition $ getAbsynWithoutLists cf
 
@@ -90,7 +89,7 @@ mkNodesPrinter cf = vcat $
       , indent 2 "}"
       ]
 
-    tokenComparisons = map (("node.type === " ++) . mkTokenNodeName) allTokens
+    tokenComparisons = map (("node.type === " ++) . mkTokenNodeName) (literals cf)
     tokenCondition = intercalate " || " tokenComparisons
     tokenCheck :: Doc = vcat
       [ indent 2 $ "if (" ++ tokenCondition ++ ") {"

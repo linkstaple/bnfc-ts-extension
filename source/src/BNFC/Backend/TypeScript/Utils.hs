@@ -4,7 +4,7 @@ import Text.PrettyPrint (Doc, text)
 
 import Data.Char (toLower, isDigit)
 
-import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax)
+import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax, literals)
 import BNFC.Utils (mkName, NameStyle (MixedCase, LowerCase), mkNames)
 import BNFC.Backend.Common.NamedVariables (getVars)
 
@@ -100,6 +100,14 @@ getVarsFromCats cats = map normalizeSuffix varNames
 -- because they will be referenced directly with TS type Array<SomeType>.
 getAbsynWithoutLists :: CF -> [Data]
 getAbsynWithoutLists = filter (not . isList . fst) . getAbstractSyntax
+
+-- | get used tokens represented as cats
+getAllTokenCats :: CF -> [Cat]
+getAllTokenCats cf = map TokenCat (literals cf)
+
+-- | get TS type names for all tokens
+getAllTokenTypenames :: CF -> [String]
+getAllTokenTypenames cf = map catToTsType (getAllTokenCats cf)
 
 mkTokenNodeName :: String -> String
 mkTokenNodeName tokenName = wrapSQ (tokenName ++ "Token")

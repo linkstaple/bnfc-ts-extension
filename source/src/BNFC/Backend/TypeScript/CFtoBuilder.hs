@@ -7,8 +7,8 @@ import Data.Maybe (mapMaybe)
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 
 import BNFC.Utils ((+++), camelCase_)
-import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, WithPosition (wpThing), literals)
-import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, catToTsType, getVarsFromCats, mkTokenNodeName, indent)
+import BNFC.CF (CF, Cat (ListCat, TokenCat, Cat), identCat, isList, IsFun (isNilFun, isOneFun, isConsFun, isCoercion), catToStr, ruleGroups, Rul (rhsRule, funRule), SentForm, WithPosition (wpThing))
+import BNFC.Backend.TypeScript.Utils (indentStr, wrapSQ, catToTsType, getVarsFromCats, mkTokenNodeName, indent, getAllTokenCats, getAllTokenTypenames)
 import BNFC.Options (SharedOptions (lang))
 import BNFC.Backend.Antlr.CFtoAntlr4Parser (antlrRuleLabel, makeLeftRecRule)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
@@ -30,7 +30,7 @@ cfToBuilder cf opts = vcat $ intersperse (text "")
     buildFuns = map mkBuildFunction datas
     buildTokensFuns = map mkBuildTokenFunction allTokenCats
 
-    allTokenCats = map TokenCat (literals cf)
+    allTokenCats = getAllTokenCats cf
     datas = cfToGroups cf
 
 mkThrowErrorStmt :: Cat -> String
@@ -76,9 +76,9 @@ mkImportDecls cf lang = vcat
     ctxNames = concatMap (\(cat, rules) -> identCat cat : zipWith (\(fun, _) idx -> antlrRuleLabel cat fun (Just idx)) rules [1..]) groups
     ctxImports = intercalate ", " $ nub $ map (++ "Context") ctxNames
 
-    tokenImports = map (catToTsType . TokenCat) (literals cf)
-    astNames = nub $ tokenImports ++ (map (\(cat, _) -> catToTsType cat) $ filter (isUsualCat . fst) groups)
-    astImports = intercalate ", " (filter (not . null) astNames)
+    tokenTypenames = getAllTokenTypenames cf
+    typenames = nub $ tokenTypenames ++ (map (catToTsType . fst) $ filter (isUsualCat . fst) groups)
+    astImports = intercalate ", " (filter (not . null) typenames)
 
     ctxImportStmt = "import {" ++ ctxImports ++ "} from './" ++ parserFile ++ "'"
     astImportStmt = "import {" ++ astImports ++ "} from './abstract'"
