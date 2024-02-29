@@ -57,10 +57,10 @@ mkBuildTokenFunction tokenCat = vcat
 
 -- | generate name for function which will build node for some cat.
 mkBuildFnName :: Cat -> String
-mkBuildFnName cat = "build" ++ firstUpperCase restName
+mkBuildFnName cat = "build" ++ firstUpperCase (restName cat)
   where
-    restName = case cat of
-      ListCat cat  -> catToStr cat ++ "List"
+    restName cat = case cat of
+      ListCat cat  -> restName cat ++ "List"
       TokenCat cat -> cat ++ "Token"
       otherCat     -> catToStr otherCat
 
