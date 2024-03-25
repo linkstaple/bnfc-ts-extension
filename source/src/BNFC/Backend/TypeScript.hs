@@ -2,8 +2,9 @@
 
 module BNFC.Backend.TypeScript ( makeTypeScript ) where
 
-import Prelude hiding ((<>))
 import Text.PrettyPrint ( text, vcat, render )
+
+import Prelude hiding ((<>))
 import System.FilePath ((</>), pathSeparator)
 import System.Directory ( createDirectoryIfMissing )
 import Data.Char (toLower)
@@ -37,7 +38,7 @@ makeTypeScript opts@Options{..} cf = do
 
     mkfile (dirBase </> "abstract.ts") makeTsComment abstractContent
     mkfile (dirBase </> "builder.ts") makeTsComment builderContent
-    -- mkfile (dirBase </> "printer.ts") makeTsComment printerContent
+    mkfile (dirBase </> "printer.ts") makeTsComment printerContent
 
   where
     abstractContent = cfToAbstract cf
@@ -129,7 +130,7 @@ makeTypeScript opts@Options{..} cf = do
     makefileContent _ = vcat [makefileVars, "", makefileRules, ""]
 
 makeTsComment :: String -> String
-makeTsComment = ("// -- TypeScript -- " ++)
+makeTsComment = ("// TypeScript " ++)
 
 toLowerCase :: String -> String
 toLowerCase = map toLower

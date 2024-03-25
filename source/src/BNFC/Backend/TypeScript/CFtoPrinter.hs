@@ -5,7 +5,7 @@ import Data.List (nub, intercalate, find, uncons)
 
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat, nest)
 
-import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, ListCat), WithPosition (wpThing), IsFun (isCoercion, isConsFun, isOneFun), catToStr, SentForm, rulesForNormalizedCat, normCat, getAbstractSyntax, normCatOfList)
+import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, ListCat), WithPosition (wpThing), IsFun (isCoercion, isConsFun, isOneFun, isNilFun), catToStr, SentForm, rulesForNormalizedCat, normCat, getAbstractSyntax, normCatOfList, catOfList)
 import BNFC.Utils ((+++))
 import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, getVarsFromCats, toMixedCase, getAbsynWithoutLists, getAllTokenTypenames, getAllTokenCats)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
@@ -14,6 +14,7 @@ import Data.Maybe (isJust, isNothing)
 cfToPrinter :: CF -> Doc
 cfToPrinter cf = vcat
     [ importsDecl
+    -- , listPrinterDecl
     , tokenPrinterDecl
     , nodePrinterDecls
     ]
@@ -23,6 +24,17 @@ cfToPrinter cf = vcat
 
     nodePrinterDecls = vcat $ map (mkNodePrinter cf) cats
     cats = map fst $ getAbstractSyntax cf
+
+    -- listPrinterDecl = vcat
+    --   [ "export function printList_<T>(list: Array<T>, printCb: (item: T) => string, sep: string, isTerminator: boolean): string {"
+    --   , indent 2 $ "if (list.length === 0) {"
+    --   , indent 4 $ "return ''"
+    --   , indent 2 $ "}"
+    --   , indent 2 $ "const result = list.map(printCb).join(sep)"
+    --   , indent 2 $ "const tail = isTerminator ? sep : ''"
+    --   , indent 2 $ "return result + tail"
+    --   , "}"
+    --   ]
 
 mkImportDecls :: CF -> Doc
 mkImportDecls cf = text astImportStmt
@@ -62,6 +74,32 @@ mkTokenPrinter cf = vcat
       , "}"
       ]
 
+-- | get separator for list of cats and a flag if it is actually terminator
+-- true - separator, false - terminator
+-- getSepForListCat :: CF -> Cat -> (String, Bool)
+-- getSepForListCat cf listCat@(ListCat _) = (separator, not isTerminator)
+--   where
+--     rules = rulesForNormalizedCat cf listCat
+--     consRule = find (isConsFun . funRule) rules
+--     consSeparator = maybe Nothing findSeparator consRule
+
+--     oneRule = find (isOneFun . funRule) rules
+--     oneSeparator = maybe Nothing findSeparator oneRule
+
+--     nilRule = find (isOneFun . funRule) rules
+
+--     findSeparator :: Rul a -> Maybe String
+--     findSeparator rule = fmap fst (uncons terminals)
+--       where
+--         terminals = rights (rhsRule rule)
+
+--     separator = maybe " " (++ " ") consSeparator
+--     -- isSeparator = isJust consSeparator && isJust oneRule && isNothing oneSeparator
+--     isTerminator = (isJust nilRule && isNothing oneRule && isJust consRule && isJust consSeparator)
+--       || (isNothing nilRule && isJust oneRule && isJust oneSeparator && isJust consRule && isJust consSeparator)
+
+-- getSepForListCat _ cat = error $ "'getSepForListCat' can not be applied to non-list cat " ++ show cat
+
 mkNodePrinter :: CF -> Cat -> Doc
 mkNodePrinter cf cat@(Cat _) = vcat $ concat
     [ [text $ "export function" +++ printFnName ++ "(node:" +++ catToTsType cat ++ "): string {" ]
@@ -77,7 +115,7 @@ mkNodePrinter cf cat@(Cat _) = vcat $ concat
 
     labels = map fst rules
     rulesConditions = map mkIfStmt labels
-    rulesPrinters = map mkRulePrinter rules
+    rulesPrinters = map (mkRulePrinter cf) rules
 
     mkIfStmt label = vcat
       [ indent 2 $ "if (node.type === " ++ wrapSQ label ++ ") {"
@@ -103,16 +141,19 @@ mkNodePrinter cf listCat@(ListCat _) = vcat
     oneRule = find (isOneFun . funRule) rules
     oneSeparator = maybe Nothing findSeparator oneRule
 
+    nilRule = find (isNilFun . funRule) rules
+
     findSeparator :: Rul a -> Maybe String
     findSeparator rule = fmap fst (uncons terminals)
       where
         terminals = rights (rhsRule rule)
 
     separator = maybe " " (++ " ") consSeparator
-    isSeparator = isJust consSeparator && isJust oneRule && isNothing oneSeparator
+    isTerminator = (isJust nilRule && isNothing oneRule && isJust consRule && isJust consSeparator)
+      || (isNothing nilRule && isJust oneRule && isJust oneSeparator && isJust consRule && isJust consSeparator)
 
-    printItemFn = mkPrintFnName (normCatOfList listCat)
-    returnStmt = if isSeparator
+    printItemFn = mkPrintFnName (catOfList listCat)
+    returnStmt = if not isTerminator
       then text $ "return list.map(" ++ printItemFn ++ ").join('" ++ separator ++ "')"
       else vcat
         [ "if (list.length === 0) {"
@@ -123,8 +164,8 @@ mkNodePrinter cf listCat@(ListCat _) = vcat
 
 mkNodePrinter _ otherCat = error $ "Unknown category for making node printer" +++ catToStr otherCat
 
-mkRulePrinter :: (String, SentForm) -> Doc
-mkRulePrinter (ruleLabel, sentForm) = vcat
+mkRulePrinter :: CF -> (String, SentForm) -> Doc
+mkRulePrinter cf (ruleLabel, sentForm) = vcat
     [ text $ "export function" +++ fnName ++ "(node:" +++ toMixedCase ruleLabel ++ "): string {"
     , indent 2 $ "return `" ++ prettifiedRule ++ "`"
     , "}"
@@ -140,12 +181,24 @@ mkRulePrinter (ruleLabel, sentForm) = vcat
 
     varNames = getVarsFromCats (lefts sentForm)
     sentFormWithVarNames = map (either (\(cat, idx) ->
-      "${" ++ mkPrintFnName (normCat cat) ++ "(node." ++ varNames !! idx ++ ")}") id) $ leftsIndexed sentForm 0
+      "${" ++ getPrinterForCat (cat, idx) ++ "}") id) $ leftsIndexed sentForm 0
+
+    getPrinterForCat :: (Cat, Int) -> String
+    -- getPrinterForCat (listCat@(ListCat itemCat), idx) = "printList_(" ++ listArgument ++ "," +++ printCbArgument ++ ", '" ++ sep ++ "', " ++ isTerminalArgument ++ ")"
+    --   where
+    --     (sep, isSep) = getSepForListCat cf listCat
+
+    --     listArgument = "node." ++ varNames !! idx
+    --     isTerminalArgument = if isSep then "false" else "true"
+    --     printCbArgument = mkPrintFnName itemCat
+
+    getPrinterForCat (cat, idx) = mkPrintFnName cat ++ "(node." ++ varNames !! idx ++ ")"
 
     prettifiedRule = unwords sentFormWithVarNames
 
 mkPrintFnName :: Cat -> String
-mkPrintFnName cat = "print" ++ firstUpperCase (mkName cat)
+mkPrintFnName cat = "print" ++ firstUpperCase (mkName normalizedCat)
   where
     mkName (ListCat cat) = mkName cat ++ "List"
     mkName otherCat      = catToStr otherCat
+    normalizedCat = normCat cat
