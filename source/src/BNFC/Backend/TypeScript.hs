@@ -18,7 +18,6 @@ import BNFC.Backend.Antlr (makeAntlr)
 import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
 import BNFC.Backend.TypeScript.CFtoBuilder (cfToBuilder, mkBuildFnName)
 import BNFC.Backend.TypeScript.CFtoPrinter (cfToPrinter)
-import BNFC.Backend.TypeScript.Utils (indent)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
@@ -50,23 +49,25 @@ makeTypeScript opts@Options{..} cf = do
 
     packageJsonContent = vcat
       [ "{"
-      , indent 2 $ "\"name\": \"" ++ toLowerCase lang ++ "\","
-      , indent 2 "\"version\": \"1.0.0\","
-      , indent 2 "\"description\": \"\","
-      , indent 2 "\"main\": \"index.ts\","
-      , indent 2 "\"scripts\": {"
-      , indent 4 "\"run\": \"ts-node index.ts\""
-      , indent 2 "},"
-      , indent 2 "\"keywords\": [],"
-      , indent 2 "\"author\": \"\","
-      , indent 2 "\"license\": \"ISC\","
-      , indent 2 "\"dependencies\": {"
-      , indent 4 "\"antlr4\": \"^4.13.1\""
-      , indent 2 "},"
-      , indent 2 "\"devDependencies\": {"
-      , indent 4 "\"ts-node\": \"^10.9.1\","
-      , indent 4 "\"typescript\": \"^5.2.2\""
-      , indent 2 "}"
+      , nest 2 $ vcat
+        [ text $ "\"name\": \"" ++ toLowerCase lang ++ "\","
+        , "\"version\": \"1.0.0\","
+        , "\"description\": \"\","
+        , "\"main\": \"index.ts\","
+        , "\"scripts\": {"
+        , nest 2 "\"run\": \"ts-node index.ts\""
+        , "},"
+        , "\"keywords\": [],"
+        , "\"author\": \"\","
+        , "\"license\": \"ISC\","
+        , "\"dependencies\": {"
+        , nest 2 "\"antlr4\": \"^4.13.1\""
+        , "},"
+        , "\"devDependencies\": {"
+        , nest 2 "\"ts-node\": \"^10.9.1\","
+        , nest 2 "\"typescript\": \"^5.2.2\""
+        , "}"
+        ]
       , "}"
       ]
 
