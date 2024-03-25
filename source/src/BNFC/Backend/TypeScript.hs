@@ -2,7 +2,7 @@
 
 module BNFC.Backend.TypeScript ( makeTypeScript ) where
 
-import Text.PrettyPrint ( text, vcat, render )
+import Text.PrettyPrint ( text, vcat, render, nest )
 
 import Prelude hiding ((<>))
 import System.FilePath ((</>), pathSeparator)
@@ -15,11 +15,11 @@ import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Common.Makefile as MakeFile
 import BNFC.Backend.Antlr (makeAntlr)
-import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
 import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
 import BNFC.Backend.TypeScript.CFtoBuilder (cfToBuilder, mkBuildFnName)
 import BNFC.Backend.TypeScript.CFtoPrinter (cfToPrinter)
 import BNFC.Backend.TypeScript.Utils (indent)
+import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 
 makeTypeScript :: SharedOptions -> CF -> MkFiles ()
 makeTypeScript opts@Options{..} cf = do
@@ -73,21 +73,75 @@ makeTypeScript opts@Options{..} cf = do
     lexerClassName = lang ++ "GrammarLexer"
     parserClassName = lang ++ "GrammarParser"
 
-    indexTsContent = vcat $ map text
-      [ "import {CharStream, CommonTokenStream} from 'antlr4'"
-      , "import " ++ lexerClassName ++ " from './" ++ lang ++ "Lexer'"
-      , "import " ++ parserClassName ++ " from './" ++ lang ++ "Parser'"
-      , "import {" ++ rootBuildFnName ++ "} from './builder'"
+    indexTsContent = vcat
+      [ "import {CharStream, CommonTokenStream, ErrorListener, FileStream, RecognitionException, Recognizer} from 'antlr4'"
+      , text $ "import " ++ lexerClassName ++ " from './" ++ lang ++ "Lexer'"
+      , text $ "import " ++ parserClassName ++ " from './" ++ lang ++ "Parser'"
+      , text $ "import {" ++ rootBuildFnName ++ "} from './builder'"
+      , "import fs from 'fs'"
+      , "import path from 'path'"
+      , "import * as readline from 'readline/promises'"
       , ""
-      , "const input = 'your text here'"
-      , "const chars = new CharStream(input) // replace this with a FileStream as required"
-      , "const lexer = new " ++ lexerClassName ++ "(chars)"
-      , "const tokens = new CommonTokenStream(lexer)"
-      , "const parser = new " ++ parserClassName ++ "(tokens)"
-      , "const tree =" +++ rootBuildFnName ++ "(parser." ++ catToNT rootCat ++ "())"
-      , "console.dir(tree, {depth: 6})"
+      , text $ "class" +++ errorListenerClassName ++ "<T> extends ErrorListener<T> {"
+      , nest 2 $ vcat
+        [ "constructor() {"
+        , nest 2 "super()"
+        , "}"
+        , ""
+        , "syntaxError(_recognizer: Recognizer<T>, _offendingSymbol: T, _line: number, _column: number, _msg: string, e: RecognitionException | undefined) {"
+        , nest 2 "process.exit()"
+        , "}"
+        ]
+      , "}"
+      , ""
+      ,"async function getInput() {"
+      , nest 2 $ vcat
+        [ "const filename = process.argv[2]"
+        , "if (filename) {"
+        , nest 2 $ vcat
+          [ "const fullPath = path.resolve(filename)"
+          , "if (!fs.existsSync(fullPath)) {"
+          , nest 2 "console.log(`file ${fullPath} does not exist`)"
+          , nest 2 "process.exit()"
+          , "}"
+          , "return new FileStream(fullPath)"
+          ]
+        ,"} else {"
+        , nest 2 $ vcat
+          [ "const rl = readline.createInterface(process.stdin, process.stdout)"
+          , "const input = await rl.question('')"
+          , "rl.close()"
+          , "return new CharStream(input)"
+          ]
+        ,"}"
+        ]
+      , "}"
+      , ""
+      , "function createParser(charStream: CharStream) {"
+      , nest 2 $ vcat
+        [ "const lexer = new StellaGrammarLexer(charStream)"
+        , text $ "lexer.addErrorListener(new" +++ errorListenerClassName ++ "())"
+        , "const tokenStream = new CommonTokenStream(lexer)"
+        , "const parser = new StellaGrammarParser(tokenStream)"
+        , text $ "parser.addErrorListener(new" +++ errorListenerClassName ++ "())"
+        , "return parser"
+        ]
+      , "}"
+      , ""
+      , "async function main() {"
+      , nest 2 $ vcat
+        ["const input = await getInput()"
+        ,"const parser = createParser(input)"
+        ,"const ast = buildProgram(parser.program())"
+        ,"console.dir(ast, {depth: 6})"
+        ]
+      , "}"
+      , ""
+      , "main()"
       , ""
       ]
+      where
+        errorListenerClassName = firstUpperCase lang ++ "ErrorListener"
     rootBuildFnName = mkBuildFnName rootCat
     rootCat = fst (head datas)
 
