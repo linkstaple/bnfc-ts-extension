@@ -197,8 +197,8 @@ mkRulePrinter cf (ruleLabel, sentForm) = vcat
     prettifiedRule = unwords sentFormWithVarNames
 
 mkPrintFnName :: Cat -> String
-mkPrintFnName cat = "print" ++ firstUpperCase (mkName normalizedCat)
+mkPrintFnName cat = "print" ++ mkName normalizedCat
   where
-    mkName (ListCat cat) = mkName cat ++ "List"
-    mkName otherCat      = catToStr otherCat
+    mkName (ListCat cat) = ("ListOf"++) $ firstUpperCase (mkName cat)
+    mkName otherCat      = firstUpperCase $ catToStr otherCat
     normalizedCat = normCat cat
