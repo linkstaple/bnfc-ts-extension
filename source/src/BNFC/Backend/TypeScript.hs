@@ -82,6 +82,7 @@ makeTypeScript opts@Options{..} cf = do
       , "import fs from 'fs'"
       , "import path from 'path'"
       , "import * as readline from 'readline/promises'"
+      , "import {printProgram} from './printer'"
       , ""
       , text $ "class" +++ errorListenerClassName ++ "<T> extends ErrorListener<T> {"
       , nest 2 $ vcat
@@ -95,7 +96,7 @@ makeTypeScript opts@Options{..} cf = do
         ]
       , "}"
       , ""
-      ,"async function getInput() {"
+      , "async function getInput() {"
       , nest 2 $ vcat
         [ "const filename = process.argv[2]"
         , "if (filename) {"
@@ -107,14 +108,14 @@ makeTypeScript opts@Options{..} cf = do
           , "}"
           , "return new FileStream(fullPath)"
           ]
-        ,"} else {"
+        , "} else {"
         , nest 2 $ vcat
-          [ "const rl = readline.createInterface(process.stdin, process.stdout)"
-          , "const input = await rl.question('')"
-          , "rl.close()"
-          , "return new CharStream(input)"
-          ]
-        ,"}"
+            [ "const rl = readline.createInterface(process.stdin, process.stdout)"
+            , "const input = await rl.question('')"
+            , "rl.close()"
+            , "return new CharStream(input)"
+            ]
+        , "}"
         ]
       , "}"
       , ""
@@ -131,10 +132,11 @@ makeTypeScript opts@Options{..} cf = do
       , ""
       , "async function main() {"
       , nest 2 $ vcat
-        ["const input = await getInput()"
-        ,"const parser = createParser(input)"
-        ,"const ast = buildProgram(parser.program())"
-        ,"console.dir(ast, {depth: 6})"
+        [ "const input = await getInput()"
+        , "const parser = createParser(input)"
+        , "const ast = buildProgram(parser.program())"
+        , "console.dir(ast, {depth: 6})"
+        , "console.log(printProgram(ast))"
         ]
       , "}"
       , ""
