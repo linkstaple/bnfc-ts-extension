@@ -111,8 +111,18 @@ makeTypeScript opts@Options{..} cf = do
         , "} else {"
         , nest 2 $ vcat
             [ "const rl = readline.createInterface(process.stdin, process.stdout)"
-            , "const input = await rl.question('')"
-            , "rl.close()"
+            , "const inputPromise = new Promise<string>(resolve => {"
+            , nest 2 $ vcat
+              [ "let input = ''"
+              , "rl.on('line', (data) => {"
+              , nest 2 "input += data"
+              , "})"
+              , ".on('close', () => {"
+              , nest 2 "resolve(input)"
+              , "})"
+              ]
+            , "})"
+            , "const input = await inputPromise"
             , "return new CharStream(input)"
             ]
         , "}"
