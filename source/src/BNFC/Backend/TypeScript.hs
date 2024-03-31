@@ -55,7 +55,8 @@ makeTypeScript opts@Options{..} cf = do
         , "\"description\": \"\","
         , "\"main\": \"index.ts\","
         , "\"scripts\": {"
-        , nest 2 "\"run\": \"ts-node index.ts\""
+        , nest 2 "\"run\": \"ts-node index.ts\","
+        , nest 2 "\"init\": \"tsc --init\""
         , "},"
         , "\"keywords\": [],"
         , "\"author\": \"\","
@@ -82,7 +83,6 @@ makeTypeScript opts@Options{..} cf = do
       , "import fs from 'fs'"
       , "import path from 'path'"
       , "import * as readline from 'readline/promises'"
-      , "import {printProgram} from './printer'"
       , ""
       , text $ "class" +++ errorListenerClassName ++ "<T> extends ErrorListener<T> {"
       , nest 2 $ vcat
@@ -136,7 +136,6 @@ makeTypeScript opts@Options{..} cf = do
         , "const parser = createParser(input)"
         , "const ast = buildProgram(parser.program())"
         , "console.dir(ast, {depth: 6})"
-        , "console.log(printProgram(ast))"
         ]
       , "}"
       , ""
@@ -170,7 +169,8 @@ makeTypeScript opts@Options{..} cf = do
       , ("lexer", [refVarWithPrefix "LEXER_NAME" ++ ".g4"], [MakeFile.refVar "ANTLR4" +++ "-Dlanguage=TypeScript" +++ refVarWithPrefix "LEXER_NAME" ++ ".g4"])
       , ("parser", [refVarWithPrefix "PARSER_NAME" ++ ".g4"], [MakeFile.refVar "ANTLR4" +++ "-Dlanguage=TypeScript" +++ refVarWithPrefix "PARSER_NAME" ++ ".g4"])
       , ("install-deps", [MakeFile.refVar "LANG" </> "package.json"], ["npm --prefix ./" ++ MakeFile.refVar "LANG" +++ "install" +++ MakeFile.refVar "LANG"])
-      , (MakeFile.refVar "LANG", ["lexer", "parser", "install-deps"], [])
+      , ("init-ts-project", [MakeFile.refVar "LANG" </> "package.json"], ["cd" +++ MakeFile.refVar "LANG" +++ "&& npm run init" ])
+      , (MakeFile.refVar "LANG", ["lexer", "parser", "install-deps", "init-ts-project"], [])
       , ("clean", [],
         [ "rm -rf" +++ MakeFile.refVar "LANG" </> "node_modules"
         , rmFile "LEXER_NAME" ".interp"
