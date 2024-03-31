@@ -5,7 +5,7 @@ import Data.List (nub, intercalate, find, uncons, intersperse)
 
 import Text.PrettyPrint.HughesPJClass (Doc, text, vcat, nest)
 
-import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, ListCat, TokenCat), WithPosition (wpThing), IsFun (isCoercion, isConsFun, isOneFun, isNilFun), catToStr, SentForm, rulesForNormalizedCat, normCat, getAbstractSyntax, normCatOfList, catOfList, isList)
+import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, ListCat, TokenCat, CoercCat), WithPosition (wpThing), IsFun (isCoercion, isConsFun, isOneFun, isNilFun), catToStr, SentForm, rulesForNormalizedCat, normCat, normCatOfList, catOfList, isList, allParserCats, rulesForCat)
 import BNFC.Utils ((+++))
 import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, getVarsFromCats, toMixedCase, getAbsynWithoutLists, getAllTokenTypenames, getAllTokenCats)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
@@ -25,7 +25,11 @@ cfToPrinter cf = vcat
     importsDecl = mkImportDecls cf
     tokenPrinterDecl = mkTokenPrinter cf
 
-    cats = map fst $ getAbstractSyntax cf
+    -- we intentionally want to have rules for list cats, which have items of type Coerc
+    cats = let isCoercCat (CoercCat _ _) = True
+               isCoercCat _              = False
+            in filter (not . isCoercCat) $ allParserCats cf
+
     nodesPrettifiersDecls = vcat $ intersperse (text "") $ map (mkNodePrettifier cf) cats
     nodesPrintersDecls = vcat $ intersperse (text "") $ map mkNodePrinter cats
 
@@ -105,16 +109,22 @@ rendererDeclaration = vcat
         , nest 2 "const newLine = new NewLineToken()"
         , nest 2 "newLine.unnest()"
         , nest 2 "tokensList.push(newLine, new TextToken(token), new NewLineToken())"
-        , "} else if (['!', '@', '&', '<', '[', '.', '$', '#'].includes(token)) {"
+        , "} else if (['!', '@', '&', '<', '[', '$', '#'].includes(token)) {"
         , nest 2 "tokensList.push(new TextToken(token))"
         , "} else if (token === '(') {"
         , nest 2 "this.dropTrailingSpaces(tokensList)"
         , nest 2 "tokensList.push(new TextToken(token))"
-        , "} else if ([')', ']', '>'].includes(token)) {"
+        , "} else if ([')', ']', '>', ','].includes(token)) {"
         , nest 2 "this.dropTrailingSpaces(tokensList)"
         , nest 2 "this.dropTrailingNewLines(tokensList)"
         , nest 2 "tokensList.push(new TextToken(token), new SpaceToken())"
+        , "} else if (token === '.') {"
+        , nest 2 "this.dropTrailingSpaces(tokensList)"
+        , nest 2 "this.dropTrailingNewLines(tokensList)"
+        , nest 2 "tokensList.push(new TextToken(token))"
         , "} else if (token === ';') {"
+        , nest 2 "this.dropTrailingSpaces(tokensList)"
+        , nest 2 "this.dropTrailingNewLines(tokensList)"
         , nest 2 "tokensList.push(new TextToken(token), new NewLineToken())"
         , "} else {"
         , nest 2 "tokensList.push(new TextToken(token), new SpaceToken())"
@@ -270,7 +280,7 @@ mkNodePrettifier cf listCat@(ListCat _) = vcat
     prettifyFnName = mkPrettifyFnName listCat
     catOfListType = catToTsType (normCatOfList listCat)
 
-    rules = rulesForNormalizedCat cf listCat
+    rules = rulesForCat cf listCat
     consRule = find (isConsFun . funRule) rules
     consSeparator = maybe Nothing findSeparator consRule
 
@@ -331,15 +341,13 @@ mkRulePrettifier (ruleLabel, sentForm) = vcat
     prettifyBody = "return [" ++ prettifiedRule ++ "]"
 
 mkPrettifyFnName :: Cat -> String
-mkPrettifyFnName cat = "prettify" ++ mkName normalizedCat
+mkPrettifyFnName cat = "prettify" ++ mkName cat
   where
-    mkName (ListCat cat) = ("ListOf"++) $ firstUpperCase (mkName cat)
-    mkName otherCat      = firstUpperCase $ catToStr otherCat
-    normalizedCat = normCat cat
+    mkName (ListCat cat) = ("ListOf"++) $ firstUpperCase (catToStr cat)
+    mkName otherCat      = firstUpperCase $ catToStr (normCat otherCat)
 
 mkPrintFnName :: Cat -> String
-mkPrintFnName cat = "print" ++ mkName normalizedCat
+mkPrintFnName cat = "print" ++ mkName cat
   where
-    mkName (ListCat cat) = ("ListOf"++) $ firstUpperCase (mkName cat)
-    mkName otherCat      = firstUpperCase $ catToStr otherCat
-    normalizedCat = normCat cat
+    mkName (ListCat itemCat) = "ListOf" ++ firstUpperCase (catToStr itemCat)
+    mkName otherCat          = firstUpperCase $ catToStr (normCat otherCat)
