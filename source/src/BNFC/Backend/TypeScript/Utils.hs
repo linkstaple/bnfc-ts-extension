@@ -2,10 +2,10 @@ module BNFC.Backend.TypeScript.Utils where
 
 import Text.PrettyPrint (Doc, text)
 
-import Data.Char (toLower, isDigit)
+import Data.Char (toLower)
 
 import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax, literals)
-import BNFC.Utils (mkName, NameStyle (MixedCase, LowerCase), mkNames)
+import BNFC.Utils (mkName, NameStyle (MixedCase, OrigCase), mkNames)
 import BNFC.Backend.Common.NamedVariables (getVars)
 
 -- | wrap string into single quotes.
@@ -76,7 +76,7 @@ reservedTokenNames = map catToStr reservedTokenCats
 -- | get variable names which will be used in node structure
 -- for categories used in production rule.
 getVarsFromCats :: [Cat] -> [String]
-getVarsFromCats cats = map normalizeSuffix varNames
+getVarsFromCats cats = mkNames ["type"] OrigCase normalizedVars
   where
     normalizedCats = map normCat cats
     indexedVars = getVars normalizedCats
@@ -87,14 +87,6 @@ getVarsFromCats cats = map normalizeSuffix varNames
         varNameSuffix = if idx == 0 then "" else "_" ++ show idx
     
     normalizedVars = map normalizeVar indexedVars
-    varNames = mkNames ["type"] LowerCase normalizedVars
-
-    normalizeSuffix :: String -> String
-    normalizeSuffix varName
-        | isDigit lastChar = init varName ++ "_" ++ [lastChar]
-        | otherwise        = varName
-      where
-        lastChar = last varName
 
 -- | we don't need to declare nodes, which will represent list
 -- because they will be referenced directly with TS type Array<SomeType>.
