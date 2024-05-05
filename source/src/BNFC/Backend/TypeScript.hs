@@ -15,6 +15,7 @@ import BNFC.Options (SharedOptions (Options, inPackage, lang, optMake, dLanguage
 import BNFC.Utils (mkName, NameStyle (CamelCase), replace, (+.+), (+++))
 import BNFC.Backend.Common.Makefile as MakeFile
 import BNFC.Backend.Antlr (makeAntlr)
+import BNFC.Backend.Antlr.CFtoAntlr4Parser (catToNT)
 import BNFC.Backend.TypeScript.CFtoAbstract (cfToAbstract)
 import BNFC.Backend.TypeScript.CFtoBuilder (cfToBuilder, mkBuildFnName)
 import BNFC.Backend.TypeScript.CFtoPrinter (cfToPrinter)
@@ -131,10 +132,10 @@ makeTypeScript opts@Options{..} cf = do
       , ""
       , "function createParser(charStream: CharStream) {"
       , nest 2 $ vcat
-        [ "const lexer = new StellaGrammarLexer(charStream)"
+        [ text $ "const lexer = new" +++ lexerClassName ++ "(charStream)"
         , text $ "lexer.addErrorListener(new" +++ errorListenerClassName ++ "())"
         , "const tokenStream = new CommonTokenStream(lexer)"
-        , "const parser = new StellaGrammarParser(tokenStream)"
+        , text $ "const parser = new" +++ parserClassName ++ "(tokenStream)"
         , text $ "parser.addErrorListener(new" +++ errorListenerClassName ++ "())"
         , "return parser"
         ]
@@ -144,7 +145,7 @@ makeTypeScript opts@Options{..} cf = do
       , nest 2 $ vcat
         [ "const input = await getInput()"
         , "const parser = createParser(input)"
-        , "const ast = buildProgram(parser.program())"
+        , text $ "const ast =" +++ rootBuildFnName ++ "(parser." ++ catToNT rootCat ++ "())"
         , "console.dir(ast, {depth: 6})"
         ]
       , "}"
