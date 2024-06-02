@@ -354,7 +354,7 @@ targetOptions =
   , Option "" ["check"]         (NoArg (\o -> o {target = TargetCheck}))
     "No output. Just check input LBNF file"
   , Option "" ["typescript"]    (NoArg (\o -> o {target = TargetTypeScript}))
-    "Not implemented yet."
+    "Output TypeScript code for use with ANTLR"
   , Option "" ["antlr"]         (NoArg (\o -> o {target = TargetAntlr}))
     "Output lexer and parser grammars for ANTLRv4"
   ]
