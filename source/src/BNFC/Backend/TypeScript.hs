@@ -163,8 +163,8 @@ makeTypeScript opts@Options{..} cf = do
 
     makefileVars = vcat $ makeVars
       [("LANG", lang)
-      , ("LEXER_NAME", lang ++ "Lexer")
-      , ("PARSER_NAME", lang ++ "Parser")
+      , ("LEXER_NAME", pkgName ++ "Lexer")
+      , ("PARSER_NAME", pkgName ++ "Parser")
       , ("ANTLR4", "java org.antlr.v4.Tool")
       ]
 
