@@ -5,8 +5,8 @@ import Text.PrettyPrint (Doc, text)
 import Data.Char (toLower)
 
 import BNFC.CF (Cat (TokenCat, ListCat), catToStr, normCat, Data, CF, isList, getAbstractSyntax, literals)
-import BNFC.Utils (mkName, NameStyle (MixedCase, OrigCase), mkNames)
-import BNFC.Backend.Common.NamedVariables (getVars)
+import BNFC.Utils (mkName, NameStyle (OrigCase, MixedCase), mkNames)
+import BNFC.Backend.Common.NamedVariables (getVars, firstLowerCase)
 
 -- | wrap string into single quotes.
 wrapSQ :: String -> String
@@ -59,7 +59,11 @@ reservedKeywords =
   ]
 
 toMixedCase :: String -> String
-toMixedCase = mkName reservedKeywords MixedCase
+toMixedCase = firstLowerCase . mkName reservedKeywords MixedCase
+
+-- | produces a type name for rule label
+mkTypeName :: String -> String
+mkTypeName = mkName reservedKeywords OrigCase
 
 reservedTokenCats :: [Cat]
 reservedTokenCats =

@@ -6,7 +6,7 @@ import Text.PrettyPrint.HughesPJClass (Doc, text, vcat)
 
 import BNFC.CF (CF, Data, Cat (TokenCat), catInteger, catDouble, literals)
 import BNFC.Utils ( (+++) )
-import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, toMixedCase, catToTsType, indent, getVarsFromCats, mkTokenNodeName, getAbsynWithoutLists)
+import BNFC.Backend.TypeScript.Utils (wrapSQ, indentStr, catToTsType, indent, getVarsFromCats, mkTokenNodeName, getAbsynWithoutLists, mkTypeName)
 
 type TypeName = String
 
@@ -31,7 +31,7 @@ dataToAbstract (cat, rules) = vcat
     ]
   where
     typeName = catToTsType cat
-    ruleNames = map (toMixedCase . fst) rules
+    ruleNames = map (mkTypeName . fst) rules
     rulesDecl = vcat $ intersperse (text "") $ map mkRuleDecl rules
 
 mkRuleDecl :: (String, [Cat]) -> Doc
@@ -44,7 +44,7 @@ mkRuleDecl (ruleName, cats) = vcat $ concat
     ]
   where
     valuesList = map (indent 2) $ zipWith (\varName varType -> concat [varName, ": ", varType]) varNames varTypes
-    typeName = toMixedCase ruleName
+    typeName = mkTypeName ruleName
     varNames = getVarsFromCats cats
     varTypes = map catToTsType cats
 

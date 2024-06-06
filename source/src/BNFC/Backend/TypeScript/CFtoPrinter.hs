@@ -7,7 +7,7 @@ import Text.PrettyPrint.HughesPJClass (Doc, text, vcat, nest)
 
 import BNFC.CF (CF, ruleGroups, Rul (rhsRule, funRule), Cat (Cat, ListCat, TokenCat, CoercCat), WithPosition (wpThing), IsFun (isCoercion, isConsFun, isOneFun, isNilFun), catToStr, SentForm, rulesForNormalizedCat, normCat, normCatOfList, catOfList, isList, allParserCats, rulesForCat)
 import BNFC.Utils ((+++))
-import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, getVarsFromCats, toMixedCase, getAbsynWithoutLists, getAllTokenTypenames, getAllTokenCats)
+import BNFC.Backend.TypeScript.Utils (catToTsType, indent, wrapSQ, getVarsFromCats, getAbsynWithoutLists, getAllTokenTypenames, getAllTokenCats, mkTypeName)
 import BNFC.Backend.Common.NamedVariables (firstUpperCase)
 import Data.Maybe (isJust, isNothing, fromMaybe)
 
@@ -183,7 +183,7 @@ mkImportDecls cf = text astImportStmt
     tokensTypeNames = getAllTokenTypenames cf
     catsTypeNames = map catToTsType $ filter isUsualCat rulesCats
 
-    labelsTypeNames = concatMap (map (toMixedCase . fst) . snd) $
+    labelsTypeNames = concatMap (map (mkTypeName . fst) . snd) $
                           getAbsynWithoutLists cf
 
     allTypeNames = nub $ tokensTypeNames ++ catsTypeNames ++ labelsTypeNames
@@ -237,7 +237,7 @@ mkNodePrinter otherCat = error $ "Unknown category for making node printer" +++ 
 
 mkRulePrinter :: String -> Doc
 mkRulePrinter ruleLabel = vcat
-    [ text $ "export function" +++ printFnName ++ "(node:" +++ toMixedCase ruleLabel ++ "): string {"
+    [ text $ "export function" +++ printFnName ++ "(node:" +++ mkTypeName ruleLabel ++ "): string {"
     , indent 2 $ "return renderer.print(" ++ prettifyFnName ++ "(node))"
     , "}"
     ]
@@ -316,7 +316,7 @@ mkNodePrettifier _ otherCat = error $ "Unknown category for making node prettifi
 
 mkRulePrettifier :: (String, SentForm) -> Doc
 mkRulePrettifier (ruleLabel, sentForm) = vcat
-    [ text $ "function" +++ prettifyFnName ++ "(node:" +++ toMixedCase ruleLabel ++ "): string[] {"
+    [ text $ "function" +++ prettifyFnName ++ "(node:" +++ mkTypeName ruleLabel ++ "): string[] {"
     , indent 2 prettifyBody
     , "}"
     ]
