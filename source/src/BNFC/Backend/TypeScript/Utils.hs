@@ -56,6 +56,9 @@ reservedKeywords =
   , "delete"
   , "return"
   , "typeof"
+  , "switch"
+  , "case"
+  , "break"
   ]
 
 toMixedCase :: String -> String
